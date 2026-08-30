@@ -145,7 +145,12 @@ fn run_probe(bin: &Path, args: &[String]) -> Option<(bool, String)> {
     status.map(|s| (s.success(), out.trim().to_string()))
 }
 
-#[tauri::command]
+// async: up to 8 probes run sequentially, each up to PROBE_TIMEOUT — a plain
+// `#[tauri::command]` runs inline on the IPC/UI thread and would freeze the
+// window for as long as ~32s. Every other IO-bound command in this crate
+// (`compute_probe`, `modal_status`, `probe_endpoint_models`, `probe_large_file`)
+// is async for the same reason.
+#[tauri::command(async)]
 pub fn detect_agent_clis(probes: Vec<CliProbe>) -> Vec<DetectedCli> {
     // The enriched PATH, not the inherited one: a GUI-launched app gets a
     // minimal PATH, and an agent CLI is a user-installed binary outside it.
@@ -174,7 +179,10 @@ pub fn detect_agent_clis(probes: Vec<CliProbe>) -> Vec<DetectedCli> {
                 // check.
                 if out.is_empty() { None } else { Some(out) }
             });
-            let auth_ok = p.auth_args.as_ref().and_then(|a| run_probe(&resolved, a).map(|(ok, _)| ok));
+            let auth_ok = p
+                .auth_args
+                .as_ref()
+                .and_then(|a| run_probe(&resolved, a).map(|(ok, _)| ok));
             DetectedCli {
                 id: p.id,
                 found: true,
@@ -237,5 +245,61 @@ mod tests {
             start.elapsed() < PROBE_TIMEOUT,
             "draining concurrently should finish well under the timeout"
         );
+    }
+
+    /// authArgs wiring: `detect_agent_clis` must run the entry's OWN auth
+    /// probe and report ITS exit status — a separate child process from the
+    /// version probe, not a reuse of the version probe's result. Before the
+    /// catalog declared any `authArgs` this path never ran at all (no catalog
+    /// entry exercised it), which is exactly the "dead code" finding this
+    /// guards against.
+    #[cfg(unix)]
+    #[test]
+    fn runs_the_auth_probe_and_reports_its_own_exit_status() {
+        let dir = std::env::temp_dir().join(format!("osd-authprobe-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("fakecli");
+        // Models `claude auth status` / `codex login status`: the version
+        // probe and the auth probe succeed or fail independently.
+        fs::write(
+            &f,
+            "#!/bin/sh\ncase \"$1\" in\n  --version) echo 1.0.0 ;;\n  signedin) exit 0 ;;\n  *) exit 1 ;;\nesac\n",
+        )
+        .unwrap();
+        fs::set_permissions(&f, fs::Permissions::from_mode(0o755)).unwrap();
+
+        // No other test in this file reads or writes PATH, so this is safe
+        // even though cargo runs tests in parallel by default.
+        let saved_path = std::env::var("PATH").unwrap_or_default();
+        std::env::set_var("PATH", format!("{}:{saved_path}", dir.to_string_lossy()));
+        let result = detect_agent_clis(vec![
+            CliProbe {
+                id: "signed-in".into(),
+                bin: "fakecli".into(),
+                version_args: vec!["--version".into()],
+                auth_args: Some(vec!["signedin".into()]),
+            },
+            CliProbe {
+                id: "signed-out".into(),
+                bin: "fakecli".into(),
+                version_args: vec!["--version".into()],
+                auth_args: Some(vec!["signedout".into()]),
+            },
+            CliProbe {
+                id: "no-auth-probe".into(),
+                bin: "fakecli".into(),
+                version_args: vec!["--version".into()],
+                auth_args: None,
+            },
+        ]);
+        std::env::set_var("PATH", saved_path);
+        fs::remove_dir_all(&dir).ok();
+
+        assert_eq!(result[0].auth_ok, Some(true));
+        assert_eq!(result[1].auth_ok, Some(false));
+        assert_eq!(result[2].auth_ok, None, "no authArgs means unknown, not signed out");
+        for r in &result {
+            assert_eq!(r.version.as_deref(), Some("1.0.0"));
+        }
     }
 }
