@@ -34,6 +34,10 @@ function formatCost(usd: number): string | null {
   return usd < 0.01 ? `<$0.01` : `$${usd.toFixed(2)}`;
 }
 
+/** The dots between the readout's fields sit a rung below the figures they
+ *  separate: punctuation should not compete with the numbers. */
+const SEP = "text-text-faint";
+
 /**
  * The quiet line under an agent answer: when it replied, how long it took, and
  * how much of the model's context window the conversation now occupies (#62).
@@ -104,13 +108,17 @@ export function MessageMeta({
       {clock && <span title={new Date(created!).toLocaleString(i18n.language)}>{clock}</span>}
       {duration !== null && (
         <>
-          <span aria-hidden>·</span>
+          <span aria-hidden className={SEP}>
+            ·
+          </span>
           <span title={t("meta.durationTitle")}>{formatDuration(duration)}</span>
         </>
       )}
       {used !== null && (
         <>
-          <span aria-hidden>·</span>
+          <span aria-hidden className={SEP}>
+            ·
+          </span>
           <span
             title={breakdown}
             className={cn("flex items-center gap-1", share !== null && share >= WARN_AT && "text-warn")}
@@ -134,7 +142,9 @@ export function MessageMeta({
       )}
       {cost && (
         <>
-          <span aria-hidden>·</span>
+          <span aria-hidden className={SEP}>
+            ·
+          </span>
           <span title={t("meta.costTitle")}>{cost}</span>
         </>
       )}

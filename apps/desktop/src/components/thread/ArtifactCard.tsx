@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ArtifactBlock, ArtifactKind } from "@ai4s/shared";
+import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 
 const ICON: Record<ArtifactKind, React.ReactNode> = {
@@ -33,20 +34,21 @@ export const ArtifactCard = memo(function ArtifactCard({
 }) {
   const { t } = useTranslation(["session", "common"]);
   return (
-    <div
+    // Flat: this sits in the conversation flow, it does not float over it.
+    <Card
       className={cn(
-        "flex items-center gap-2.5 rounded-input border border-border bg-surface px-3 py-2.5 text-sm",
-        onOpen && "cursor-pointer hover:bg-surface-2",
+        "flex items-center gap-2.5 px-3 py-2.5 text-sm",
+        onOpen && "cursor-pointer transition-colors duration-quick ease-standard hover:bg-fill-3",
       )}
       onClick={onOpen ? () => onOpen(block) : undefined}
       role={onOpen ? "button" : undefined}
     >
       <span className="shrink-0 text-accent">{ICON[block.artifact]}</span>
-      <span className="truncate font-medium text-text">{block.filename}</span>
-      <span className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-muted ring-1 ring-border">
+      <span className="truncate font-medium text-text-strong">{block.filename}</span>
+      <span className="shrink-0 rounded-pill bg-surface-2 px-2 py-0.5 text-xs text-text-muted ring-1 ring-border">
         {t(`artifact.kind.${block.artifact}`)}
       </span>
-      <span className="shrink-0 truncate text-xs text-muted">
+      <span className="shrink-0 truncate text-xs text-text-muted">
         {t("artifact.via", { tool: block.tool })}
       </span>
       <div className="flex-1" />
@@ -55,6 +57,6 @@ export const ArtifactCard = memo(function ArtifactCard({
           <SquareArrowOutUpRight size={13} /> {t("artifact.open")}
         </span>
       )}
-    </div>
+    </Card>
   );
 });

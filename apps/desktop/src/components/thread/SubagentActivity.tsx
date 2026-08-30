@@ -26,7 +26,7 @@ export function SubagentActivity({
     <div
       className={cn(
         "flex items-center gap-2 rounded-input px-2 pb-0.5 text-xs",
-        onOpen && "cursor-pointer hover:bg-surface-2",
+        onOpen && "cursor-pointer hover:bg-fill-3",
       )}
       data-subagent-activity
       role={onOpen ? "button" : undefined}

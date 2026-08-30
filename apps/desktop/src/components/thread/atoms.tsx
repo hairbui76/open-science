@@ -4,6 +4,9 @@ import { useTranslation } from "react-i18next";
 import { copyText } from "@/lib/clipboard";
 import { toast } from "@/lib/toast";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Button, IconButton } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Chip } from "@/components/ui/Chip";
 import type {
   ArtifactBlock,
   DataTableBlock,
@@ -66,6 +69,11 @@ export const UserMessage = memo(function UserMessage({
     setDraft(block.text);
     setEditing(true);
   };
+  // Named handlers, not inline arrows: the i18n lint rule reads every string
+  // literal inside a component's JSX props as user-facing copy, and these two
+  // are state tags.
+  const askEdit = () => draft.trim() && setConfirm("edit");
+  const askRevert = () => setConfirm("revert");
   const runConfirmed = () => {
     const action = confirm;
     setConfirm(null);
@@ -120,19 +128,19 @@ export const UserMessage = memo(function UserMessage({
             className="w-full resize-none bg-transparent px-2 py-1.5 text-[15px] leading-relaxed text-text outline-none"
           />
           <div className="flex justify-end gap-2 px-1 pt-1">
-            <button
-              onClick={() => setEditing(false)}
-              className="rounded-input px-3 py-1.5 text-xs font-medium text-muted hover:bg-surface hover:text-text"
-            >
+            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>
               {t("message.editing.cancel")}
-            </button>
-            <button
-              onClick={() => draft.trim() && setConfirm("edit")}
+            </Button>
+            {/* Ink, not brand: resending an edit is an ordinary confirm inside a
+                transcript, and the brand pop belongs to the screen's one CTA. */}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={askEdit}
               disabled={!draft.trim()}
-              className="rounded-input bg-accent px-3 py-1.5 text-xs font-medium text-accent-fg hover:opacity-90 disabled:opacity-40"
             >
               {t("message.editing.send")}
-            </button>
+            </Button>
           </div>
         </div>
         {confirmDialog}
@@ -149,33 +157,27 @@ export const UserMessage = memo(function UserMessage({
         data-hover-row
         className="flex items-center gap-0.5 pr-0.5 pt-1"
       >
-        <button
+        {/* `title` overrides IconButton's default (which mirrors the label), so
+            the tooltip can report "Copied" while the accessible name stays put
+            — a name that changed under a screen reader would rename the control
+            mid-interaction. */}
+        <IconButton
+          size="sm"
           onClick={copy}
+          label={t("message.copy")}
           title={copied ? t("message.copied") : t("message.copy")}
-          aria-label={t("message.copy")}
-          className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text"
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
-        </button>
+        </IconButton>
         {canEdit && (
-          <button
-            onClick={openEditor}
-            title={t("message.edit")}
-            aria-label={t("message.edit")}
-            className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text"
-          >
+          <IconButton size="sm" onClick={openEditor} label={t("message.edit")}>
             <Pencil size={14} />
-          </button>
+          </IconButton>
         )}
         {canRevert && (
-          <button
-            onClick={() => setConfirm("revert")}
-            title={t("message.revert")}
-            aria-label={t("message.revert")}
-            className="rounded p-1 text-muted hover:bg-surface-2 hover:text-text"
-          >
+          <IconButton size="sm" onClick={askRevert} label={t("message.revert")}>
             <RotateCcw size={14} />
-          </button>
+          </IconButton>
         )}
       </div>
       {confirmDialog}
@@ -249,15 +251,14 @@ export const AgentMessage = memo(function AgentMessage({
       {refs.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-2">
           {refs.map((path) => (
-            <button
+            <Chip
               key={path}
               onClick={() => onOpenArtifact?.(refToArtifactBlock(path))}
-              className="flex items-center gap-1.5 rounded-input border border-border bg-surface px-2 py-1 text-xs text-text hover:bg-surface-2"
               title={t("agentMessage.previewTitle", { path })}
             >
-              <Paperclip size={12} className="text-accent" />
+              <Paperclip size={12} className="shrink-0" />
               <span className="font-mono">{path.split(/[\\/]/).pop()}</span>
-            </button>
+            </Chip>
           ))}
         </div>
       )}
@@ -265,14 +266,14 @@ export const AgentMessage = memo(function AgentMessage({
         data-hover-row
         className="flex min-w-0 items-center gap-1.5 pt-1"
       >
-        <button
+        <IconButton
+          size="sm"
           onClick={copy}
+          label={t("message.copy")}
           title={copied ? t("message.copied") : t("message.copy")}
-          aria-label={t("message.copy")}
-          className="shrink-0 rounded p-1 text-muted hover:bg-surface-2 hover:text-text"
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
-        </button>
+        </IconButton>
         <MessageMeta
           created={created}
           completed={completed}
@@ -290,16 +291,17 @@ export const DataTable = memo(function DataTable({ block }: { block: DataTableBl
     // and the scrollbar's own height then made this card eat vertical wheel
     // events that belonged to the conversation. The marker hands WebKit's
     // latched trackpad gestures back as well (lib/wheelChain).
-    <div
+    <Card
+      raised
       {...{ [HSCROLL_ATTR]: "" }}
-      className="overflow-x-auto overflow-y-hidden rounded-card border border-border bg-surface shadow-card"
+      className="overflow-x-auto overflow-y-hidden"
     >
       {block.caption && (
         <div className="border-b border-border px-4 py-2 text-xs text-muted">{block.caption}</div>
       )}
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-border text-left text-muted">
+          <tr className="border-b border-border text-left text-text-muted">
             {block.columns.map((c) => (
               <th key={c} className="px-4 py-2 font-medium">
                 {c}
@@ -307,9 +309,11 @@ export const DataTable = memo(function DataTable({ block }: { block: DataTableBl
             ))}
           </tr>
         </thead>
+        {/* Row rules sit a rung below the header's: the border ladder has a real
+            token for that now, so the old border-border/60 blend goes. */}
         <tbody>
           {block.rows.map((row, i) => (
-            <tr key={i} className="border-b border-border/60 last:border-0">
+            <tr key={i} className="border-b border-faint last:border-0">
               {row.map((cell, j) => (
                 <td
                   key={j}
@@ -325,7 +329,7 @@ export const DataTable = memo(function DataTable({ block }: { block: DataTableBl
           ))}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 });
 
@@ -335,11 +339,11 @@ export const RunningJobsOverlay = memo(function RunningJobsOverlay({
   block: RunningJobsBlock;
 }) {
   return (
-    <div className="rounded-card border border-border bg-surface shadow-card">
+    <Card raised>
       <div className="border-b border-border px-4 py-2 text-xs font-medium uppercase tracking-wider text-muted">
         {block.title}
       </div>
-      <ul className="divide-y divide-border/60">
+      <ul className="divide-y divide-faint">
         {block.jobs.map((j, i) => (
           <li key={i} className="flex items-center gap-2 px-4 py-2 text-sm">
             <RunningDot className="text-accent" />
@@ -348,10 +352,12 @@ export const RunningJobsOverlay = memo(function RunningJobsOverlay({
           </li>
         ))}
       </ul>
-    </div>
+    </Card>
   );
 });
 
+// "running" is ink, not brand: a transcript shows many of these, and a hue
+// reserved for one element per screen cannot also mark every busy step.
 const TONE: Record<NonNullable<StatusLineBlock["tone"]>, string> = {
   running: "text-accent",
   done: "text-ok",
@@ -394,7 +400,7 @@ export const HistoryRepair = memo(function HistoryRepair({
   const canRepair = !!onRevert && !!target;
 
   return (
-    <div className="rounded-card border border-border bg-surface-2/50 p-3 text-sm">
+    <div className="rounded-card border border-border bg-surface-2 p-3 text-sm">
       <div className="flex items-start gap-2">
         <Wrench size={14} className="mt-0.5 shrink-0 text-muted" aria-hidden />
         <div className="min-w-0 flex-1">
@@ -411,12 +417,12 @@ export const HistoryRepair = memo(function HistoryRepair({
               : t("historyRepair.noTarget")}
           </p>
           {canRepair && (
-            <button
-              className="mt-2.5 rounded-input border border-border px-3 py-1.5 text-sm font-medium text-text hover:bg-surface-2"
-              onClick={() => setConfirming(true)}
-            >
+            // Secondary, not primary: this card is a quiet offer under an error
+            // that was already reported once — a filled button would read as a
+            // second alarm.
+            <Button variant="secondary" className="mt-2.5" onClick={() => setConfirming(true)}>
               {t("historyRepair.action")}
-            </button>
+            </Button>
           )}
         </div>
       </div>

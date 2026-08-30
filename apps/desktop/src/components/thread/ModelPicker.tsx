@@ -22,6 +22,9 @@ import {
 } from "lucide-react";
 import { agentForTurn, useRuntimeStore } from "@/lib/runtime";
 import { useIsMobile } from "@/lib/useIsMobile";
+import { Chip } from "@/components/ui/Chip";
+import { IconButton } from "@/components/ui/Button";
+import { Panel } from "@/components/ui/Panel";
 import { cn } from "@/lib/cn";
 import {
   flattenModelOptions,
@@ -144,7 +147,7 @@ function ReasoningSlider({
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        className="relative flex h-8 cursor-pointer touch-none items-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="relative flex h-8 cursor-pointer touch-none items-center rounded-pill focus:outline-none focus-visible:ring-2 focus-visible:ring-border-selected"
       >
         {/* key={flash} replays the attention pulse each time a reasoning model is picked */}
         <div
@@ -161,7 +164,7 @@ function ReasoningSlider({
                 // Codex-style bright blue fill (not the app accent, which reads
                 // too dark/heavy here).
                 "absolute inset-y-0 left-0 rounded-full bg-[#4c9dff]",
-                dragFrac === null && "transition-[width] duration-100",
+                dragFrac === null && "transition-[width] duration-quick",
               )}
               style={{ width: posOf(liveFrac) }}
             />
@@ -170,7 +173,7 @@ function ReasoningSlider({
             <span
               key={v}
               className={cn(
-                "absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform duration-100 hover:scale-[1.9]",
+                "absolute top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform duration-quick hover:scale-[1.9]",
                 // Solid muted gray so the stops are clearly visible on the light
                 // (near-white) track by default; white only where the blue fill
                 // is behind them.
@@ -185,7 +188,7 @@ function ReasoningSlider({
                 // A defined gray ring + soft shadow so the white knob stays
                 // clearly visible on the near-white track (Codex-style).
                 "pointer-events-none absolute top-1/2 h-7 w-7 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/15 bg-white shadow-[0_1px_4px_rgba(0,0,0,0.28)]",
-                dragFrac === null && "transition-[left] duration-100",
+                dragFrac === null && "transition-[left] duration-quick",
               )}
               style={{ left: posOf(liveFrac) }}
             />
@@ -402,13 +405,14 @@ export function ModelPicker({
           className="min-w-0 flex-1 bg-transparent text-xs text-text placeholder:text-muted focus:outline-none"
         />
         {isMobile && (
-          <button
-            aria-label={t("composer.model.close")}
-            className="shrink-0 rounded-full p-1 text-muted hover:bg-surface-2 hover:text-text"
+          <IconButton
+            size="sm"
+            label={t("composer.model.close")}
+            className="h-6 w-6"
             onClick={() => setOpen(false)}
           >
             <X size={14} />
-          </button>
+          </IconButton>
         )}
       </div>
 
@@ -424,7 +428,7 @@ export function ModelPicker({
             </span>
           ) : (
             <button
-              className="truncate rounded px-1.5 py-0.5 text-[11px] text-accent hover:bg-accent/10"
+              className="truncate rounded px-1.5 py-0.5 text-[11px] text-link hover:bg-fill-3"
               onClick={() => clearSessionModel(sessionId)}
             >
               {agentModels[turnAgent!]
@@ -439,19 +443,23 @@ export function ModelPicker({
       {options.length > 0 && (
         <div className="no-scrollbar flex shrink-0 gap-1 overflow-x-auto border-b border-faint px-2 py-1.5">
           {filterChips.map((chip) => (
-            <button
+            <Chip
               key={chip.key}
+              selected={isActiveFilter(chip.value)}
+              pressed={isActiveFilter(chip.value)}
+              // Shorter and tighter than the default chip: this row sits in a
+              // dense popover, not the composer's toolbar. The resting chip also
+              // drops its border and fill so it does not punch an opaque patch
+              // through the panel's glass.
               className={cn(
-                "flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px]",
-                isActiveFilter(chip.value)
-                  ? "bg-accent/15 text-accent"
-                  : "text-muted hover:bg-surface-2 hover:text-text",
+                "h-6 gap-1 px-2 text-[11px]",
+                !isActiveFilter(chip.value) && "border-transparent bg-transparent",
               )}
               onClick={() => setFilter(chip.value)}
             >
               {chip.icon && <chip.icon size={10} />}
               {chip.label}
-            </button>
+            </Chip>
           ))}
         </div>
       )}
@@ -476,7 +484,8 @@ export function ModelPicker({
                 key={o.key}
                 className={cn(
                   "group flex items-center gap-2 rounded-input px-2 py-1.5",
-                  isCurrent ? "bg-surface-2" : "hover:bg-surface-2",
+                  "transition-colors duration-quick ease-standard",
+                  isCurrent ? "bg-fill-2" : "hover:bg-fill-3",
                 )}
               >
                 <button
@@ -501,7 +510,7 @@ export function ModelPicker({
                   aria-label={t("composer.model.favorite")}
                   aria-pressed={isFavorite}
                   className={cn(
-                    "shrink-0 rounded-full p-1 hover:bg-surface",
+                    "shrink-0 rounded-pill p-1 hover:bg-fill-2",
                     isFavorite
                       ? "text-accent"
                       : "text-muted opacity-0 group-hover:opacity-100 focus:opacity-100",
@@ -520,7 +529,7 @@ export function ModelPicker({
       {currentVariants.length > 0 && (
         <div className="shrink-0 border-t border-faint px-2 py-1.5">
           <button
-            className="flex w-full items-center gap-1.5 rounded-input px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text"
+            className="flex w-full items-center gap-1.5 rounded-input px-1.5 py-1 text-xs text-muted hover:bg-fill-3 hover:text-text"
             aria-expanded={advancedOpen}
             onClick={() => setAdvancedOpen((v) => !v)}
           >
@@ -571,7 +580,7 @@ export function ModelPicker({
           here, where the model was chosen, and make the fix one click away. */}
       {contextUnknown && (
         <button
-          className="shrink-0 border-t border-faint px-3 py-2 text-left hover:bg-hover"
+          className="shrink-0 border-t border-faint px-3 py-2 text-left hover:bg-fill-3"
           onClick={() => {
             setOpen(false);
             navigate("/settings/models");
@@ -593,7 +602,7 @@ export function ModelPicker({
 
       {/* Manage providers */}
       <button
-        className="shrink-0 border-t border-faint px-3 py-2 text-left text-xs text-accent hover:underline"
+        className="shrink-0 border-t border-faint px-3 py-2 text-left text-xs text-link hover:underline"
         onClick={() => {
           setOpen(false);
           navigate("/settings/models");
@@ -607,15 +616,12 @@ export function ModelPicker({
   return (
     <div className="relative shrink-0" ref={rootRef}>
       {/* Chip trigger */}
-      <button
+      <Chip
         aria-label={t("composer.model.aria")}
         title={t("composer.model.title")}
         aria-haspopup="dialog"
         aria-expanded={open}
-        className={cn(
-          "flex h-7 items-center rounded-full text-xs text-muted hover:bg-surface-2 hover:text-text",
-          compact ? "gap-0.5 px-1.5" : "max-w-[190px] gap-1.5 px-2.5",
-        )}
+        className={cn(compact ? "gap-0.5 px-1.5" : "max-w-[190px]")}
         onClick={() => setOpen((o) => !o)}
       >
         {switching ? (
@@ -628,17 +634,18 @@ export function ModelPicker({
           <span className="shrink-0 text-muted">· {labelVariant(activeVariant)}</span>
         )}
         {!compact && <ChevronDown size={11} className="shrink-0" />}
-      </button>
+      </Chip>
 
       {/* Desktop / wide-web: anchored popover above the chip */}
       {open && !isMobile && (
-        <div
+        <Panel
+          glass
           role="dialog"
           aria-label={t("composer.model.title")}
-          className="absolute bottom-full right-0 z-30 mb-2 flex max-h-[min(70vh,26rem)] w-[340px] flex-col overflow-hidden rounded-card border border-border bg-surface shadow-pop"
+          className="absolute bottom-full right-0 z-30 mb-2 flex max-h-[min(70vh,26rem)] w-[340px] flex-col overflow-hidden"
         >
           {body}
-        </div>
+        </Panel>
       )}
 
       {/* Mobile: bottom sheet + scrim */}
@@ -649,13 +656,13 @@ export function ModelPicker({
             onClick={() => setOpen(false)}
             aria-hidden
           />
-          <div
+          <Panel
             role="dialog"
             aria-label={t("composer.model.title")}
-            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col overflow-hidden rounded-t-card border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] shadow-pop"
+            className="fixed inset-x-0 bottom-0 z-50 flex max-h-[80vh] flex-col overflow-hidden rounded-b-none border-x-0 border-b-0 pb-[env(safe-area-inset-bottom)]"
           >
             {body}
-          </div>
+          </Panel>
         </>
       )}
     </div>

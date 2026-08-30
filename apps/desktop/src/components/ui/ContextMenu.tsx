@@ -1,13 +1,14 @@
 import * as Primitive from "@radix-ui/react-context-menu";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Panel } from "./Panel";
 
-/** Panel styling shared with the app's dropdown menus, so a right-click menu
- *  and a "…" menu are visibly the same object. */
-const PANEL =
-  "z-50 min-w-[190px] overflow-hidden rounded-card border border-border bg-surface p-1 text-[13px] text-text shadow-pop";
+/** Panel geometry shared with the app's dropdown menus, so a right-click menu
+ *  and a "…" menu are visibly the same object. Menus carry shadow-pop rather
+ *  than the rail's heavier lift. */
+const PANEL = "z-50 min-w-[190px] overflow-hidden p-1 text-[13px] text-text shadow-pop";
 const ITEM =
-  "flex cursor-pointer items-center gap-2 rounded-input px-2 py-1.5 outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-surface-2";
+  "flex cursor-pointer items-center gap-2 rounded-input px-2 py-1.5 outline-none transition-colors duration-quick ease-standard data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[highlighted]:bg-fill-3";
 
 /**
  * Right-click menu for one piece of app chrome.
@@ -32,8 +33,10 @@ export function ContextMenu({
     <Primitive.Root>
       <Primitive.Trigger asChild>{children}</Primitive.Trigger>
       <Primitive.Portal>
-        <Primitive.Content aria-label={label} className={PANEL}>
-          {items}
+        <Primitive.Content aria-label={label} asChild>
+          <Panel glass lifted={false} className={PANEL}>
+            {items}
+          </Panel>
         </Primitive.Content>
       </Primitive.Portal>
     </Primitive.Root>
@@ -60,7 +63,9 @@ export function ContextMenuItem({
       onSelect={onSelect}
       className={cn(ITEM, danger && "text-error")}
     >
-      {icon && <span className={cn("shrink-0", danger ? "text-error" : "text-muted")}>{icon}</span>}
+      {icon && (
+        <span className={cn("shrink-0", danger ? "text-error" : "text-text-muted")}>{icon}</span>
+      )}
       <span className="truncate">{children}</span>
     </Primitive.Item>
   );
@@ -78,16 +83,15 @@ export function ContextMenuSub({
 }) {
   return (
     <Primitive.Sub>
-      <Primitive.SubTrigger className={cn(ITEM, "data-[state=open]:bg-surface-2")}>
-        {icon && <span className="shrink-0 text-muted">{icon}</span>}
+      <Primitive.SubTrigger className={cn(ITEM, "data-[state=open]:bg-fill-2")}>
+        {icon && <span className="shrink-0 text-text-muted">{icon}</span>}
         <span className="truncate">{label}</span>
       </Primitive.SubTrigger>
       <Primitive.Portal>
-        <Primitive.SubContent
-          aria-label={label}
-          className={cn(PANEL, "max-h-[320px] overflow-y-auto")}
-        >
-          {children}
+        <Primitive.SubContent aria-label={label} asChild>
+          <Panel glass lifted={false} className={cn(PANEL, "max-h-[320px] overflow-y-auto")}>
+            {children}
+          </Panel>
         </Primitive.SubContent>
       </Primitive.Portal>
     </Primitive.Sub>
@@ -100,5 +104,5 @@ export function ContextMenuSeparator() {
 
 /** Shown in place of items when a submenu has nothing to offer. */
 export function ContextMenuEmpty({ children }: { children: ReactNode }) {
-  return <div className="px-2 py-1.5 text-muted">{children}</div>;
+  return <div className="px-2 py-1.5 text-text-muted">{children}</div>;
 }

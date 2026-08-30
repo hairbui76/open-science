@@ -2,6 +2,8 @@ import { memo, useState } from "react";
 import { ChevronDown, ShieldCheck, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { FindingLevel, ReviewerBlock } from "@ai4s/shared";
+import { Card } from "@/components/ui/Card";
+import { IconButton } from "@/components/ui/Button";
 import { cn } from "@/lib/cn";
 
 const BADGE: Record<FindingLevel, { className: string }> = {
@@ -20,21 +22,26 @@ export const ReviewerCard = memo(function ReviewerCard({ block }: { block: Revie
     .map((f, i) => [f, i] as const)
     .filter(([, i]) => !dismissed.has(i));
   return (
-    <div className="rounded-card border border-border bg-surface shadow-card">
+    // Flat: a finding list is conversation content, not floating chrome.
+    // `overflow-hidden` keeps the header's hover fill inside the rounded edge.
+    <Card className="overflow-hidden">
       <button
-        className="flex w-full items-center gap-2 px-4 py-3 text-left"
+        className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors duration-quick ease-standard hover:bg-fill-3"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
-        <ShieldCheck size={16} className="text-muted" />
-        <span className="text-sm font-medium text-text">{t("reviewer.heading")}</span>
-        <span className="text-sm text-muted">
+        <ShieldCheck size={16} className="text-text-muted" />
+        <span className="text-sm font-medium text-text-strong">{t("reviewer.heading")}</span>
+        <span className="text-sm text-text-muted">
           {t("reviewer.findingCount", { count: visible.length })}
           {dismissed.size > 0 && ` ${t("reviewer.dismissedCount", { count: dismissed.size })}`}
         </span>
         <ChevronDown
           size={16}
-          className={cn("ml-auto text-muted transition-transform", open && "rotate-180")}
+          className={cn(
+            "ml-auto text-text-muted transition-transform duration-base ease-standard",
+            open && "rotate-180",
+          )}
         />
       </button>
 
@@ -47,35 +54,38 @@ export const ReviewerCard = memo(function ReviewerCard({ block }: { block: Revie
                 <div className="flex items-start gap-2">
                   <span
                     className={cn(
-                      "shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ring-1",
+                      "shrink-0 rounded-pill px-2 py-0.5 text-xs font-medium ring-1",
                       badge.className,
                     )}
                   >
                     {t(`reviewer.badge.${f.level}`)}
                   </span>
                   {(f.tag || f.check) && (
-                    <span className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-xs text-muted ring-1 ring-border">
+                    <span className="shrink-0 rounded-pill bg-surface-2 px-2 py-0.5 text-xs text-text-muted ring-1 ring-border">
                       {f.tag ?? (f.check ? t(`reviewer.checkTag.${f.check}`) : "")}
                     </span>
                   )}
-                  <span className="min-w-0 break-words text-sm font-medium text-text">
+                  <span className="min-w-0 break-words text-sm font-medium text-text-strong">
                     {f.title}
                   </span>
-                  <button
-                    className="ml-auto shrink-0 text-muted opacity-0 hover:text-text group-hover:opacity-100"
-                    aria-label={t("reviewer.dismissAria", { title: f.title })}
+                  <IconButton
+                    size="sm"
+                    label={t("reviewer.dismissAria", { title: f.title })}
+                    // The tooltip stays the short, generic wording; the long
+                    // per-finding phrasing is for the screen reader only.
                     title={t("reviewer.dismissTitle")}
+                    className="ml-auto opacity-0 group-hover:opacity-100"
                     onClick={() => setDismissed(new Set([...dismissed, i]))}
                   >
                     <X size={14} />
-                  </button>
+                  </IconButton>
                 </div>
                 {f.evidence && (
                   // Evidence is code and file paths — one long token with no
                   // space in it, which `pre-wrap` alone will not break. Without
                   // `break-words` a finding stuck out past the card and made
                   // the whole conversation scroll sideways.
-                  <p className="whitespace-pre-wrap break-words font-mono text-[12.5px] leading-relaxed text-muted">
+                  <p className="whitespace-pre-wrap break-words font-mono text-[12.5px] leading-relaxed text-text-muted">
                     {f.evidence}
                   </p>
                 )}
@@ -83,11 +93,11 @@ export const ReviewerCard = memo(function ReviewerCard({ block }: { block: Revie
             );
           })}
           {visible.length === 0 && block.findings.length > 0 && (
-            <p className="text-sm text-muted">{t("reviewer.allDismissed")}</p>
+            <p className="text-sm text-text-muted">{t("reviewer.allDismissed")}</p>
           )}
-          {block.note && <p className="text-sm text-muted">{block.note}</p>}
+          {block.note && <p className="text-sm text-text-muted">{block.note}</p>}
         </div>
       )}
-    </div>
+    </Card>
   );
 });

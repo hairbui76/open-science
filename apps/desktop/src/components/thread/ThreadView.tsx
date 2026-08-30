@@ -35,7 +35,7 @@ export function ThreadView({ session }: { session: Session }) {
             onClick={() => setSidebarCollapsed(false)}
             aria-label={t("live.header.expandSidebarAria")}
             title={t("live.header.expandSidebarTitle", { shortcut: isMac ? "⌘B" : "Ctrl+B" })}
-            className="fade-in rounded p-1 text-text hover:bg-surface-2"
+            className="fade-in rounded p-1 text-text hover:bg-fill-3"
           >
             <PanelLeft size={14} strokeWidth={1.5} />
           </button>

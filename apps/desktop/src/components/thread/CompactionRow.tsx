@@ -36,7 +36,7 @@ export function CompactionRow({ block }: { block: CompactionBlock }) {
         <span
           className={cn(
             "flex items-center gap-1.5 rounded-full border border-warn bg-surface px-2.5 py-1 font-medium",
-            "group-hover:bg-surface-2",
+            "group-hover:bg-fill-3",
           )}
         >
           <Layers size={12} className="shrink-0" />

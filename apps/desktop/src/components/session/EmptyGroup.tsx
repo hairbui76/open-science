@@ -3,6 +3,7 @@ import { LayoutGrid, Plus } from "lucide-react";
 import { useDragPane } from "@/lib/dragPane";
 import { useLayoutStore } from "@/lib/layout";
 import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/Button";
 
 /**
  * Onboarding for an empty group (no panes): a full-area drop target plus a
@@ -19,22 +20,23 @@ export function EmptyGroup() {
     <div
       data-empty-group
       className={cn(
-        "flex h-full w-full items-center justify-center p-8 transition-colors",
-        hovering && "bg-accent/10 ring-1 ring-inset ring-accent/50",
+        "flex h-full w-full items-center justify-center p-8 transition-colors duration-quick ease-standard",
+        // Drop feedback stays on the neutral ladder: the brand pop on this
+        // screen belongs to the one CTA below, and a drag highlight that
+        // competes with it would put two brand surfaces on an empty pane.
+        hovering && "bg-fill-2 ring-1 ring-inset ring-border-selected",
       )}
     >
       <div className="flex max-w-sm flex-col items-center gap-3 text-center">
-        <LayoutGrid size={28} strokeWidth={1.5} className="text-muted" />
-        <div className="text-sm font-medium text-text">{t("group.empty.title")}</div>
-        <p className="text-sm text-muted">{t("group.empty.hint")}</p>
-        {/* Fills the empty group with a fresh draft pane. */}
-        <button
-          onClick={() => reset(null)}
-          className="mt-1 flex items-center gap-1.5 rounded-input bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:opacity-90"
-        >
+        <LayoutGrid size={28} strokeWidth={1.5} className="text-text-muted" />
+        <div className="text-sm font-medium text-text-strong">{t("group.empty.title")}</div>
+        <p className="text-sm text-text-muted">{t("group.empty.hint")}</p>
+        {/* Fills the empty group with a fresh draft pane — the only action an
+            empty Screen offers, so it is this screen's single brand CTA. */}
+        <Button variant="brand" onClick={() => reset(null)} className="mt-1">
           <Plus size={14} strokeWidth={2} />
           {t("group.empty.newSession")}
-        </button>
+        </Button>
       </div>
     </div>
   );

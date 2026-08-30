@@ -171,7 +171,7 @@ function Action({
     <button
       onClick={onClick}
       title={label}
-      className="flex items-center gap-1.5 rounded-input px-2 py-1 text-text outline-none hover:bg-surface-2"
+      className="flex items-center gap-1.5 rounded-input px-2 py-1 text-text outline-none hover:bg-fill-3"
     >
       <span className="text-muted">{icon}</span>
       <span className="whitespace-nowrap">{label}</span>

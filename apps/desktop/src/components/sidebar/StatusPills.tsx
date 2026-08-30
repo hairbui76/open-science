@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { ModelStatus, RuntimeStatus } from "@ai4s/shared";
 import { useRuntimeStore } from "@/lib/runtime";
 import { cn } from "@/lib/cn";
+import { Chip } from "@/components/ui/Chip";
 
 const RUNTIME_TONE: Record<RuntimeStatus, string> = {
   ready: "bg-ok",
@@ -24,7 +25,7 @@ export function StatusPills() {
   const model: ModelStatus = defaultModel ? "connected" : "disconnected";
 
   return (
-    <div className="flex flex-col gap-1 text-xs text-muted">
+    <div className="flex flex-col items-start gap-1">
       <Pill
         dot={RUNTIME_TONE[runtime]}
         label={t("status.runtime")}
@@ -39,14 +40,16 @@ export function StatusPills() {
   );
 }
 
+/** `readOnly`: these report state, they are not controls — there is nothing to
+ *  click, so the chip is a label that happens to be pill-shaped. */
 function Pill({ dot, label, value }: { dot: string; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2 px-2">
+    <Chip readOnly className="max-w-full">
       <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dot)} />
       <span className="shrink-0">{label}</span>
-      <span className="ml-auto min-w-0 truncate capitalize text-text/70" title={value}>
+      <span className="min-w-0 truncate capitalize text-text" title={value}>
         {value}
       </span>
-    </div>
+    </Chip>
   );
 }

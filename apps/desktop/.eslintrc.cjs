@@ -61,6 +61,19 @@ module.exports = {
             "options",
             "fill",
             "align",
+            // The ui/ primitives' size scale ("sm" | "md"), the same kind of
+            // render-mode discriminator as the neighbouring "variant" — never
+            // user-facing text.
+            "size",
+            // ARIA's own vocabulary ("dialog" | "menu" | "listbox" | ...), not
+            // prose. Only surfaced once controls moved to the ui/ primitives:
+            // the rule inspects attributes on custom components but not on the
+            // plain DOM elements these replaced.
+            "aria-haspopup",
+            // Browser autofill hints ("off" | "current-password" | ...), same
+            // story: a technical vocabulary that only became visible to the
+            // rule when <input> became the Input primitive.
+            "autoComplete",
           ],
         },
         "object-properties": {

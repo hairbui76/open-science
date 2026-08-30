@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { FolderOpen, FolderPlus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
+import { Panel } from "@/components/ui/Panel";
+import { Button, IconButton } from "@/components/ui/Button";
 import { isTauri, pickFolder } from "@/lib/tauri";
 import { baseName } from "@/components/thread/WorkspaceChip";
 import { datedWorkspaceName } from "@/lib/runtime";
@@ -97,22 +99,24 @@ export function SplitMenu({
   };
 
   const trigger = (
-    <button
+    <IconButton
+      // eslint-disable-next-line i18next/no-literal-string -- control size token, not UI copy
+      size="sm"
       onClick={() => {
         if (!isTauri || !sourceFolder) return onSplit(null);
         setOpen((o) => !o);
       }}
-      className="rounded-md p-1 text-muted transition-colors hover:bg-surface-2 hover:text-text"
-      title={label}
-      aria-label={label}
+      label={label}
       aria-expanded={open}
     >
       {icon}
-    </button>
+    </IconButton>
   );
 
+  // Menu rows: full-width and left-aligned, so the pill geometry and centring
+  // the shared Button brings are both overridden here.
   const item =
-    "flex w-full items-center gap-2 rounded-input px-2 py-1.5 text-left text-xs text-text hover:bg-surface-2";
+    "h-auto w-full justify-start gap-2 rounded-input px-2 py-1.5 text-left text-xs font-normal text-text";
   return (
     <div ref={rootRef} className="shrink-0">
       {trigger}
@@ -120,33 +124,38 @@ export function SplitMenu({
         sourceFolder &&
         typeof document !== "undefined" &&
         createPortal(
-          <div
+          <Panel
             ref={menuRef}
             role="menu"
+            glass
+            // A menu sits close to its trigger: shadow-pop, not the rail's lift.
+            lifted={false}
             style={{ top: at?.top ?? 0, left: at?.left ?? 0 }}
             className={cn(
-              "fixed z-[60] w-[min(16.25rem,calc(100vw-16px))] rounded-card border border-border",
-              "bg-surface p-1 shadow-pop",
+              "fixed z-[60] w-[min(16.25rem,calc(100vw-16px))] p-1 shadow-pop",
               // Hidden until placed, so it never paints at the top-left corner.
               !at && "invisible",
             )}
           >
-            <div className="px-2 py-1.5 text-[11px] text-muted">{t("splitDestination.title")}</div>
-            <button className={item} onClick={() => pick(sourceFolder)}>
-              <FolderOpen size={13} className="shrink-0 text-muted" />
+            <div className="px-2 py-1.5 text-[11px] text-text-muted">
+              {t("splitDestination.title")}
+            </div>
+            <Button variant="ghost" className={item} onClick={() => pick(sourceFolder)}>
+              <FolderOpen size={13} className="shrink-0 text-text-muted" />
               <span className="min-w-0 flex-1 truncate">
                 {t("splitDestination.continueIn", { name: baseName(sourceFolder) })}
               </span>
-            </button>
-            <button className={item} onClick={() => pick(null)}>
-              <FolderPlus size={13} className="shrink-0 text-muted" />
+            </Button>
+            <Button variant="ghost" className={item} onClick={() => pick(null)}>
+              <FolderPlus size={13} className="shrink-0 text-text-muted" />
               <span className="min-w-0 flex-1 truncate">{t("splitDestination.newFolder")}</span>
-              <span className="shrink-0 font-mono text-[11px] text-muted">
+              <span className="shrink-0 font-mono text-[11px] text-text-muted">
                 {datedWorkspaceName()}
               </span>
-            </button>
-            <button
-              className={cn(item, "text-muted")}
+            </Button>
+            <Button
+              variant="ghost"
+              className={cn(item, "text-text-muted")}
               // Pick first, split only if the user actually chose a folder.
               onClick={() => {
                 void pickFolder().then((dir) => {
@@ -156,8 +165,8 @@ export function SplitMenu({
               }}
             >
               <span className="min-w-0 flex-1 truncate">{t("splitDestination.chooseOther")}</span>
-            </button>
-          </div>,
+            </Button>
+          </Panel>,
           document.body,
         )}
     </div>
