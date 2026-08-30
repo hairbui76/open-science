@@ -120,7 +120,17 @@ fn run_probe(bin: &Path, args: &[String]) -> Option<(bool, String)> {
                 }
                 std::thread::sleep(Duration::from_millis(25));
             }
-            Err(_) => break None,
+            Err(_) => {
+                // The unconditional rx.recv() below only returns once the
+                // reader thread hits EOF, which only happens once nothing
+                // holds the write end of the stdout pipe open. That is true
+                // on the timeout arm above because it kills the child first;
+                // it must be true here too, or a wait() failure while the
+                // child is still alive would leave the reader blocked
+                // forever and this call — inside a Tauri command — hung.
+                kill_probe(&mut child);
+                break None;
+            }
         }
     };
 
