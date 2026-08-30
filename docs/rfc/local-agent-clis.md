@@ -1,6 +1,6 @@
 # RFC: Driving locally-installed agent CLIs
 
-Status: **Design agreed 2026-08-30; not implemented.**
+Status: **Stage 1 (detection) implemented; Stage 2 (native Claude Code runtime) not implemented.**
 Amends: [`multi-agent-acp.md`](./multi-agent-acp.md) — it does not overturn it.
 Builds on: [`agent-runtime.md`](./agent-runtime.md) — the `AgentRuntime` boundary.
 
