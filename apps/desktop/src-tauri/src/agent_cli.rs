@@ -91,27 +91,48 @@ fn run_probe(bin: &Path, args: &[String]) -> Option<(bool, String)> {
         .spawn()
         .ok()?;
 
+    // Drain stdout on its own thread, concurrently with waiting for exit —
+    // NOT after the child exits. The pipe's OS buffer is small (~64KB on
+    // Linux); a probe that writes more than that before exiting blocks in
+    // write() until something reads the other end. If nothing reads until
+    // try_wait() reports an exit, a chatty probe can never exit, try_wait()
+    // never sees it exit, and the loop below burns the full PROBE_TIMEOUT
+    // before reporting a false "no version". Do not "simplify" this back to
+    // a read-after-wait — that reintroduces the deadlock.
+    let (tx, rx) = std::sync::mpsc::channel();
+    let reader = child.stdout.take().map(|mut so| {
+        std::thread::spawn(move || {
+            let mut out = String::new();
+            use std::io::Read;
+            let _ = so.read_to_string(&mut out);
+            let _ = tx.send(out);
+        })
+    });
+
     let start = Instant::now();
-    loop {
+    let status = loop {
         match child.try_wait() {
-            Ok(Some(status)) => {
-                let mut out = String::new();
-                if let Some(mut so) = child.stdout.take() {
-                    use std::io::Read;
-                    let _ = so.read_to_string(&mut out);
-                }
-                return Some((status.success(), out.trim().to_string()));
-            }
+            Ok(Some(status)) => break Some(status),
             Ok(None) => {
                 if start.elapsed() > PROBE_TIMEOUT {
                     kill_probe(&mut child);
-                    return None;
+                    break None;
                 }
                 std::thread::sleep(Duration::from_millis(25));
             }
-            Err(_) => return None,
+            Err(_) => break None,
         }
+    };
+
+    // The child is gone by now (exited, killed, or unwaitable), so its
+    // stdout pipe is closed and the reader thread finishes promptly — join
+    // it so no thread is left running past this call.
+    let out = rx.recv().unwrap_or_default();
+    if let Some(h) = reader {
+        let _ = h.join();
     }
+
+    status.map(|s| (s.success(), out.trim().to_string()))
 }
 
 #[tauri::command]
@@ -133,10 +154,15 @@ pub fn detect_agent_clis(probes: Vec<CliProbe>) -> Vec<DetectedCli> {
                     auth_ok: None,
                 };
             };
-            let version = run_probe(&resolved, &p.version_args).and_then(|(ok, out)| {
-                // A CLI that prints its version on a non-zero exit is still
-                // installed; only an empty answer is no answer.
-                if out.is_empty() && !ok { None } else { Some(out) }
+            let version = run_probe(&resolved, &p.version_args).and_then(|(_, out)| {
+                // Empty stdout is no answer, whatever the exit code — a CLI
+                // that exits 0 and prints nothing is "installed, version
+                // unknown" (Some("") would render as a blank version, which
+                // is a worse signal to the UI than no version at all). A
+                // non-empty answer on a non-zero exit still counts: some
+                // CLIs print their version before failing an unrelated
+                // check.
+                if out.is_empty() { None } else { Some(out) }
             });
             let auth_ok = p.auth_args.as_ref().and_then(|a| run_probe(&resolved, a).map(|(ok, _)| ok));
             DetectedCli {
@@ -177,5 +203,29 @@ mod tests {
     #[test]
     fn absent_bin_resolves_to_none() {
         assert!(resolve_on_path("definitely-not-a-real-cli-xyz", "/nonexistent").is_none());
+    }
+
+    /// A probe that writes more than the pipe buffer before exiting must not
+    /// deadlock: this is the scenario `run_probe`'s reader thread exists for.
+    /// Without it, `head`/`tr` would block in write(), never exit, and this
+    /// test would stall to PROBE_TIMEOUT (4s) instead of returning promptly.
+    #[cfg(unix)]
+    #[test]
+    fn drains_stdout_from_a_chatty_probe_without_stalling_to_the_timeout() {
+        let bin = Path::new("/bin/sh");
+        let args = vec![
+            "-c".to_string(),
+            // 200_000 bytes is well past any realistic OS pipe buffer
+            // (~64KB on Linux).
+            "head -c 200000 /dev/zero | tr '\\0' 'x'".to_string(),
+        ];
+        let start = Instant::now();
+        let (ok, out) = run_probe(bin, &args).expect("a completed probe returns Some");
+        assert!(ok, "the shell pipeline should exit 0");
+        assert_eq!(out.len(), 200_000);
+        assert!(
+            start.elapsed() < PROBE_TIMEOUT,
+            "draining concurrently should finish well under the timeout"
+        );
     }
 }
