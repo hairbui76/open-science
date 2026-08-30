@@ -434,5 +434,16 @@
     "reveal": "Show what you typed",
     "hide": "Hide what you typed",
     "privacy": "Sent only to ssh on this machine. Never stored, logged, or written to provenance."
+  },
+  "installedClis": {
+    "title": "Installed agent CLIs",
+    "hint": "Agent command-line tools found on this computer. Configuring one makes this app drive it instead of the bundled runtime.",
+    "refresh": "Refresh",
+    "notInstalled": "Not installed",
+    "signedIn": "Signed in",
+    "signedOut": "Not signed in",
+    "use": "Use",
+    "none": "No known agent CLIs were found on this computer.",
+    "added": "{{name}} is configured."
   }
 }

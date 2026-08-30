@@ -434,5 +434,16 @@
     "reveal": "Afficher la saisie",
     "hide": "Masquer la saisie",
     "privacy": "Transmis uniquement au ssh de cette machine. Jamais stocké, journalisé, ni inscrit dans la provenance."
+  },
+  "installedClis": {
+    "title": "CLI d'agents installées",
+    "hint": "Outils en ligne de commande d'agents trouvés sur cet ordinateur. En configurer un fait que cette application le pilote à la place du runtime intégré.",
+    "refresh": "Actualiser",
+    "notInstalled": "Non installé",
+    "signedIn": "Connecté",
+    "signedOut": "Non connecté",
+    "use": "Utiliser",
+    "none": "Aucune CLI d'agent connue n'a été trouvée sur cet ordinateur.",
+    "added": "{{name}} est configuré."
   }
 }

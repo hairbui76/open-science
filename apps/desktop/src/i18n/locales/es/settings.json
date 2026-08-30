@@ -434,5 +434,16 @@
     "reveal": "Mostrar lo escrito",
     "hide": "Ocultar lo escrito",
     "privacy": "Solo se envía al ssh de este equipo. Nunca se guarda, ni se registra, ni entra en la procedencia."
+  },
+  "installedClis": {
+    "title": "CLIs de agentes instaladas",
+    "hint": "Herramientas de línea de comandos de agentes encontradas en esta máquina. Configurar una hace que esta app la use en lugar del entorno de ejecución incluido.",
+    "refresh": "Actualizar",
+    "notInstalled": "No instalado",
+    "signedIn": "Sesión iniciada",
+    "signedOut": "Sesión no iniciada",
+    "use": "Usar",
+    "none": "No se encontró ninguna CLI de agente conocida en esta máquina.",
+    "added": "Se ha configurado {{name}}."
   }
 }
