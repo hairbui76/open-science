@@ -20,6 +20,10 @@ export interface CliCatalogEntry {
   /** Optional sign-in probe; a zero exit means signed in. */
   authArgs?: string[];
   launch: CliLaunch;
+  /** Whether this build has confirmed the launch command against a real binary.
+   *  Only verified entries get one-click configure in Settings; others require
+   *  manual command entry. Widening this requires actually running that CLI first. */
+  verified: boolean;
 }
 
 export const AGENT_CLI_CATALOG: readonly CliCatalogEntry[] = [
@@ -31,6 +35,7 @@ export const AGENT_CLI_CATALOG: readonly CliCatalogEntry[] = [
     bin: "claude",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "npx", args: ["-y", "@zed-industries/claude-code-acp"] },
+    verified: true,
   },
   // Codex stays on its bridge permanently: `codex exec` cannot route an
   // approval request back to us, and a sandbox is containment, not consent.
@@ -40,47 +45,66 @@ export const AGENT_CLI_CATALOG: readonly CliCatalogEntry[] = [
     bin: "codex",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "npx", args: ["-y", "@agentclientprotocol/codex-acp"] },
+    verified: true,
   },
+  // Unconfirmed: the launch line `gemini --acp` is an educated guess, not yet
+  // verified against a real binary.
   {
     id: "gemini",
     name: "Gemini CLI",
     bin: "gemini",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "gemini", args: ["--acp"] },
+    verified: false,
   },
+  // Unconfirmed: the launch line `opencode acp` is an educated guess, not yet
+  // verified against a real binary.
   {
     id: "opencode",
     name: "OpenCode",
     bin: "opencode",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "opencode", args: ["acp"] },
+    verified: false,
   },
+  // Unconfirmed: the launch line `cursor-agent --acp` is an educated guess, not yet
+  // verified against a real binary.
   {
     id: "cursor-agent",
     name: "Cursor Agent",
     bin: "cursor-agent",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "cursor-agent", args: ["--acp"] },
+    verified: false,
   },
+  // Unconfirmed: the launch line `qwen --acp` is an educated guess, not yet
+  // verified against a real binary.
   {
     id: "qwen",
     name: "Qwen Code",
     bin: "qwen",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "qwen", args: ["--acp"] },
+    verified: false,
   },
+  // Unconfirmed: the launch line `copilot --acp` is an educated guess, not yet
+  // verified against a real binary.
   {
     id: "copilot",
     name: "GitHub Copilot CLI",
     bin: "copilot",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "copilot", args: ["--acp"] },
+    verified: false,
   },
+  // Unconfirmed: the launch line `amp --acp` is an educated guess, not yet
+  // verified against a real binary.
   {
     id: "amp",
     name: "Amp",
     bin: "amp",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "amp", args: ["--acp"] },
+    verified: false,
   },
 ];

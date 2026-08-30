@@ -29,4 +29,11 @@ describe("agent CLI catalog", () => {
       for (const b of banned) expect(line).not.toContain(b);
     }
   });
+
+  it("marks entries verified only when we have confirmed the launch line", () => {
+    // Widening the verified set requires actually running that CLI against a
+    // real binary first. This test guards against casual flag flips.
+    const verified = AGENT_CLI_CATALOG.filter((e) => e.verified).map((e) => e.id).sort();
+    expect(verified).toEqual(["claude", "codex"]);
+  });
 });
