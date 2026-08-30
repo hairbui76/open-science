@@ -77,7 +77,7 @@ export function InstalledClisCard() {
           <li key={row.id} className="flex items-center gap-2">
             <span className="min-w-0 flex-1 truncate text-sm text-text">{row.name}</span>
             {row.version && (
-              <span className="shrink-0 font-mono text-xs text-faint">{row.version}</span>
+              <span className="shrink-0 font-mono text-xs text-text-faint">{row.version}</span>
             )}
             {row.authOk === true && <Chip readOnly>{t("installedClis.signedIn")}</Chip>}
             {row.authOk === false && <Chip readOnly>{t("installedClis.signedOut")}</Chip>}
@@ -88,7 +88,7 @@ export function InstalledClisCard() {
                 </Button>
               )
             ) : (
-              <span className="shrink-0 text-xs text-faint">{t("installedClis.notInstalled")}</span>
+              <span className="shrink-0 text-xs text-text-faint">{t("installedClis.notInstalled")}</span>
             )}
           </li>
         ))}
