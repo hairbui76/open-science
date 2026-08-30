@@ -439,6 +439,7 @@
     "title": "CLIs de agentes instaladas",
     "hint": "Herramientas de línea de comandos de agentes encontradas en esta máquina. Configurar una hace que esta app la use en lugar del entorno de ejecución incluido.",
     "refresh": "Actualizar",
+    "error": "No se pudieron comprobar las CLIs instaladas.",
     "notInstalled": "No instalado",
     "signedIn": "Sesión iniciada",
     "signedOut": "Sesión no iniciada",

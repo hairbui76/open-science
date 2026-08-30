@@ -439,6 +439,7 @@
     "title": "Installed agent CLIs",
     "hint": "Agent command-line tools found on this computer. Configuring one makes this app drive it instead of the bundled runtime.",
     "refresh": "Refresh",
+    "error": "Could not check installed CLIs.",
     "notInstalled": "Not installed",
     "signedIn": "Signed in",
     "signedOut": "Not signed in",

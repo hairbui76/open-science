@@ -439,6 +439,7 @@
     "title": "Installierte Agent-CLIs",
     "hint": "Agent-Kommandozeilentools, die auf diesem Rechner gefunden wurden. Wird eines konfiguriert, steuert diese App es anstelle der gebündelten Runtime.",
     "refresh": "Aktualisieren",
+    "error": "Installierte CLIs konnten nicht geprüft werden.",
     "notInstalled": "Nicht installiert",
     "signedIn": "Angemeldet",
     "signedOut": "Nicht angemeldet",

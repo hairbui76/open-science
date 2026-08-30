@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import i18n from "@/i18n";
 import * as detect from "@/lib/cliDetect";
+import { useRuntimeStore } from "@/lib/runtime";
 import { InstalledClisCard } from "./InstalledClisCard";
 
 vi.mock("@/lib/tauri", () => ({ isTauri: true }));
@@ -12,6 +13,10 @@ vi.mock("@/lib/cliDetect", async (importOriginal) => {
   return { ...mod, detectAgentClis: vi.fn() };
 });
 const detectAgentClis = vi.mocked(detect.detectAgentClis);
+
+// The card only decides WHICH runtime to select; the connection itself is the
+// store's job (same split as AcpAgentsCard.test.tsx), so a reconnect is a spy.
+const connectRetry = vi.hoisted(() => vi.fn(async () => true));
 
 const row = (over: Partial<detect.CliRow>): detect.CliRow => ({
   id: "claude",
@@ -34,6 +39,8 @@ describe("InstalledClisCard", () => {
     await i18n.changeLanguage("en");
     localStorage.clear();
     detectAgentClis.mockReset();
+    connectRetry.mockClear();
+    useRuntimeStore.setState({ connectRetry, status: "ready", runtimeKind: "opencode" });
   });
 
   it("shows an installed CLI with its version", async () => {
@@ -50,7 +57,7 @@ describe("InstalledClisCard", () => {
     expect(screen.queryByRole("button", { name: "Use" })).not.toBeInTheDocument();
   });
 
-  it("configuring an installed CLI writes an ACP agent and makes it active", async () => {
+  it("configuring an installed CLI writes an ACP agent, makes it active, and reconnects", async () => {
     detectAgentClis.mockResolvedValue([row({})]);
     render(<InstalledClisCard />);
     await userEvent.click(await screen.findByRole("button", { name: "Use" }));
@@ -58,7 +65,29 @@ describe("InstalledClisCard", () => {
       const saved = JSON.parse(localStorage.getItem("ai4s.acp.agents.v1") ?? "[]");
       expect(saved).toHaveLength(1);
       expect(saved[0].command).toBe("npx");
+      expect(localStorage.getItem("ai4s.acp.active.v1")).toBe(saved[0].id);
     });
+    // The runtime is chosen at connect time — selecting it does nothing to
+    // what is actually running until this fires.
+    expect(connectRetry).toHaveBeenCalled();
+  });
+
+  it("clicking Use twice does not create a duplicate agent entry", async () => {
+    detectAgentClis.mockResolvedValue([row({})]);
+    render(<InstalledClisCard />);
+    const button = await screen.findByRole("button", { name: "Use" });
+    await userEvent.click(button);
+    await userEvent.click(button);
+    await waitFor(() => {
+      const saved = JSON.parse(localStorage.getItem("ai4s.acp.agents.v1") ?? "[]");
+      expect(saved).toHaveLength(1);
+    });
+  });
+
+  it("shows an explanation instead of an empty list when detection fails", async () => {
+    detectAgentClis.mockRejectedValue(new Error("invoke failed"));
+    render(<InstalledClisCard />);
+    expect(await screen.findByText("Could not check installed CLIs.")).toBeInTheDocument();
   });
 
   it("reports a signed-out CLI without hiding it", async () => {
