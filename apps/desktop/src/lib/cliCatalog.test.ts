@@ -34,6 +34,14 @@ describe("agent CLI catalog", () => {
     // Widening the verified set requires actually running that CLI against a
     // real binary first. This test guards against casual flag flips.
     const verified = AGENT_CLI_CATALOG.filter((e) => e.verified).map((e) => e.id).sort();
-    expect(verified).toEqual(["claude", "codex"]);
+    expect(verified).toEqual(["claude", "codex", "gemini"]);
+  });
+
+  it("never declares an auth probe on an entry we have not verified", () => {
+    // An auth probe run against an unconfirmed launch line is the same
+    // guessing mistake `verified` exists to prevent — see the test above.
+    for (const e of AGENT_CLI_CATALOG) {
+      if (e.authArgs) expect(e.verified).toBe(true);
+    }
   });
 });

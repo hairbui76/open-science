@@ -29,33 +29,43 @@ export interface CliCatalogEntry {
 export const AGENT_CLI_CATALOG: readonly CliCatalogEntry[] = [
   // Claude Code has no native ACP mode (verified 2026-08-30 against 2.1.251),
   // so it runs through Zed's bridge until the native runtime lands.
+  //
+  // authArgs verified 2026-08-30 against a real `claude` binary: `auth status`
+  // prints JSON containing "loggedIn": true and exits 0 when signed in.
   {
     id: "claude",
     name: "Claude Code",
     bin: "claude",
     versionArgs: ["--version"],
+    authArgs: ["auth", "status"],
     launch: { kind: "acp", command: "npx", args: ["-y", "@zed-industries/claude-code-acp"] },
     verified: true,
   },
   // Codex stays on its bridge permanently: `codex exec` cannot route an
   // approval request back to us, and a sandbox is containment, not consent.
+  //
+  // authArgs verified 2026-08-30 against a real `codex` binary: `login status`
+  // prints "Logged in using ChatGPT" and exits 0 when signed in.
   {
     id: "codex",
     name: "Codex",
     bin: "codex",
     versionArgs: ["--version"],
+    authArgs: ["login", "status"],
     launch: { kind: "acp", command: "npx", args: ["-y", "@agentclientprotocol/codex-acp"] },
     verified: true,
   },
-  // Unconfirmed: the launch line `gemini --acp` is an educated guess, not yet
-  // verified against a real binary.
+  // The launch line `gemini --acp` IS verified: PROGRESS.md (2026-08-05)
+  // records it answering `initialize` with protocolVersion 1 against a real
+  // 0.33.1 binary, and it already ships as an ACP_PRESETS one-click entry
+  // (lib/acpAgents.ts).
   {
     id: "gemini",
     name: "Gemini CLI",
     bin: "gemini",
     versionArgs: ["--version"],
     launch: { kind: "acp", command: "gemini", args: ["--acp"] },
-    verified: false,
+    verified: true,
   },
   // Unconfirmed: the launch line `opencode acp` is an educated guess, not yet
   // verified against a real binary.
