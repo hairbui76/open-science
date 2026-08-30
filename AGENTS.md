@@ -58,7 +58,7 @@ local workspace + SQLite + JSONL provenance.
 
 ## Working conventions
 
-- Default working language for discussion is Chinese; **all project files and
+- Default working language for discussion is English; **all project files and
   code are in English** (this is a pure-English project).
 - One progress file: `PROGRESS.md`. Append one line per real milestone,
   `YYYY-MM-DD HH:MM` + a one-sentence conclusion, newest on top. Results and
