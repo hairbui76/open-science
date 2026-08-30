@@ -33,6 +33,9 @@ importers:
       '@ai4s/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@fontsource/albert-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource/inter':
         specifier: ^5.0.18
         version: 5.2.8
@@ -706,6 +709,9 @@ packages:
 
   '@floating-ui/utils@0.2.11':
     resolution: {integrity: sha512-RiB/yIh78pcIxl6lLMG0CgBXAZ2Y0eVHqMPYugu+9U0AeT6YBeiJpf7lbdJNIugFP5SIjwNRgo4DhR1Qxi26Gg==}
+
+  '@fontsource/albert-sans@5.3.0':
+    resolution: {integrity: sha512-sxMOb01R+xYfFjc708tKJOElC7qhXyjvF3hWojhX1c+AzoFO18dnbh1hPEkblwvYsY+7Chrs08y80K72omSg7Q==}
 
   '@fontsource/inter@5.2.8':
     resolution: {integrity: sha512-P6r5WnJoKiNVV+zvW2xM13gNdFhAEpQ9dQJHt3naLvfg+LkF2ldgSLiF4T41lf1SQCM9QmkqPTn4TH568IRagg==}
@@ -3927,6 +3933,8 @@ snapshots:
       react-dom: 18.3.1(react@18.3.1)
 
   '@floating-ui/utils@0.2.11': {}
+
+  '@fontsource/albert-sans@5.3.0': {}
 
   '@fontsource/inter@5.2.8': {}
 
