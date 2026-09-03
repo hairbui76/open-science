@@ -145,6 +145,38 @@ fn run_probe(bin: &Path, args: &[String]) -> Option<(bool, String)> {
     status.map(|s| (s.success(), out.trim().to_string()))
 }
 
+/// Probe one executable that has already been resolved to a real path.
+///
+/// Split out of `detect_agent_clis` so the version/auth mapping can be tested
+/// against an absolute path: testing it through the command would mean putting
+/// a fixture directory on PATH, and mutating the environment mid-run is a data
+/// race — `enriched_path()` reads PATH, other tests in this binary spawn
+/// children concurrently, and concurrent setenv/getenv is undefined behaviour.
+fn probe_resolved(
+    id: String,
+    resolved: PathBuf,
+    version_args: &[String],
+    auth_args: Option<&Vec<String>>,
+) -> DetectedCli {
+    let version = run_probe(&resolved, version_args).and_then(|(_, out)| {
+        // Empty stdout is no answer, whatever the exit code — a CLI that
+        // exits 0 and prints nothing is "installed, version unknown"
+        // (Some("") would render as a blank version, a worse signal to the
+        // UI than no version at all). A non-empty answer on a non-zero exit
+        // still counts: some CLIs print their version before failing an
+        // unrelated check.
+        if out.is_empty() { None } else { Some(out) }
+    });
+    let auth_ok = auth_args.and_then(|a| run_probe(&resolved, a).map(|(ok, _)| ok));
+    DetectedCli {
+        id,
+        found: true,
+        path: Some(resolved.to_string_lossy().to_string()),
+        version,
+        auth_ok,
+    }
+}
+
 // async: up to 8 probes run sequentially, each up to PROBE_TIMEOUT — a plain
 // `#[tauri::command]` runs inline on the IPC/UI thread and would freeze the
 // window for as long as ~32s. Every other IO-bound command in this crate
@@ -159,36 +191,16 @@ pub fn detect_agent_clis(probes: Vec<CliProbe>) -> Vec<DetectedCli> {
     let path_var = enriched_path();
     probes
         .into_iter()
-        .map(|p| {
-            let Some(resolved) = resolve_on_path(&p.bin, &path_var) else {
-                return DetectedCli {
-                    id: p.id,
-                    found: false,
-                    path: None,
-                    version: None,
-                    auth_ok: None,
-                };
-            };
-            let version = run_probe(&resolved, &p.version_args).and_then(|(_, out)| {
-                // Empty stdout is no answer, whatever the exit code — a CLI
-                // that exits 0 and prints nothing is "installed, version
-                // unknown" (Some("") would render as a blank version, which
-                // is a worse signal to the UI than no version at all). A
-                // non-empty answer on a non-zero exit still counts: some
-                // CLIs print their version before failing an unrelated
-                // check.
-                if out.is_empty() { None } else { Some(out) }
-            });
-            let auth_ok = p
-                .auth_args
-                .as_ref()
-                .and_then(|a| run_probe(&resolved, a).map(|(ok, _)| ok));
-            DetectedCli {
+        .map(|p| match resolve_on_path(&p.bin, &path_var) {
+            None => DetectedCli {
                 id: p.id,
-                found: true,
-                path: Some(resolved.to_string_lossy().to_string()),
-                version,
-                auth_ok,
+                found: false,
+                path: None,
+                version: None,
+                auth_ok: None,
+            },
+            Some(resolved) => {
+                probe_resolved(p.id, resolved, &p.version_args, p.auth_args.as_ref())
             }
         })
         .collect()
@@ -247,12 +259,15 @@ mod tests {
         );
     }
 
-    /// authArgs wiring: `detect_agent_clis` must run the entry's OWN auth
-    /// probe and report ITS exit status — a separate child process from the
-    /// version probe, not a reuse of the version probe's result. Before the
-    /// catalog declared any `authArgs` this path never ran at all (no catalog
-    /// entry exercised it), which is exactly the "dead code" finding this
-    /// guards against.
+    /// authArgs wiring: an entry's auth probe must be run as its OWN child
+    /// process and report ITS exit status, not reuse the version probe's
+    /// result. Before the catalog declared any `authArgs` this path never ran
+    /// at all, which is the "dead code" finding this guards against.
+    ///
+    /// Goes through `probe_resolved` with an absolute path rather than through
+    /// `detect_agent_clis` with a fixture directory on PATH: `enriched_path()`
+    /// reads PATH and sibling tests in this binary spawn children in parallel,
+    /// so mutating the environment here would be a data race, not a fixture.
     #[cfg(unix)]
     #[test]
     fn runs_the_auth_probe_and_reports_its_own_exit_status() {
@@ -268,37 +283,29 @@ mod tests {
         .unwrap();
         fs::set_permissions(&f, fs::Permissions::from_mode(0o755)).unwrap();
 
-        // No other test in this file reads or writes PATH, so this is safe
-        // even though cargo runs tests in parallel by default.
-        let saved_path = std::env::var("PATH").unwrap_or_default();
-        std::env::set_var("PATH", format!("{}:{saved_path}", dir.to_string_lossy()));
-        let result = detect_agent_clis(vec![
-            CliProbe {
-                id: "signed-in".into(),
-                bin: "fakecli".into(),
-                version_args: vec!["--version".into()],
-                auth_args: Some(vec!["signedin".into()]),
-            },
-            CliProbe {
-                id: "signed-out".into(),
-                bin: "fakecli".into(),
-                version_args: vec!["--version".into()],
-                auth_args: Some(vec!["signedout".into()]),
-            },
-            CliProbe {
-                id: "no-auth-probe".into(),
-                bin: "fakecli".into(),
-                version_args: vec!["--version".into()],
-                auth_args: None,
-            },
-        ]);
-        std::env::set_var("PATH", saved_path);
+        let version_args = vec!["--version".to_string()];
+        let signed_in = probe_resolved(
+            "signed-in".into(),
+            f.clone(),
+            &version_args,
+            Some(&vec!["signedin".to_string()]),
+        );
+        let signed_out = probe_resolved(
+            "signed-out".into(),
+            f.clone(),
+            &version_args,
+            Some(&vec!["signedout".to_string()]),
+        );
+        let no_probe = probe_resolved("no-auth-probe".into(), f.clone(), &version_args, None);
         fs::remove_dir_all(&dir).ok();
 
-        assert_eq!(result[0].auth_ok, Some(true));
-        assert_eq!(result[1].auth_ok, Some(false));
-        assert_eq!(result[2].auth_ok, None, "no authArgs means unknown, not signed out");
-        for r in &result {
+        assert_eq!(signed_in.auth_ok, Some(true));
+        assert_eq!(signed_out.auth_ok, Some(false));
+        assert_eq!(
+            no_probe.auth_ok, None,
+            "no authArgs means unknown, not signed out"
+        );
+        for r in [&signed_in, &signed_out, &no_probe] {
             assert_eq!(r.version.as_deref(), Some("1.0.0"));
         }
     }
