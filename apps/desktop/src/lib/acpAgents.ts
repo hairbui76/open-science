@@ -97,17 +97,24 @@ function sanitize(raw: unknown): AcpAgentConfig[] {
 // changed — a fresh array on every call reads as "changed" on every render
 // and React gives up with "Maximum update depth exceeded" — so this trades a
 // cheap raw-string re-read for a stable array reference on the common path.
+// One shared empty array, returned by every path that has no agents to report.
+// `useSyncExternalStore` compares snapshots with `Object.is`, so a fresh `[]`
+// literal reads as "changed" on every render and React gives up with "Maximum
+// update depth exceeded" — which would take down the whole Settings route on a
+// browser with site data blocked. Never return a bare `[]` from here.
+const EMPTY_AGENTS: AcpAgentConfig[] = [];
+
 let cachedAgentsRaw: string | null | undefined;
 let cachedAgents: AcpAgentConfig[] = [];
 
 export function loadAcpAgents(): AcpAgentConfig[] {
   const store = storage();
-  if (!store) return [];
+  if (!store) return EMPTY_AGENTS;
   let raw: string | null;
   try {
     raw = store.getItem(AGENTS_KEY);
   } catch {
-    return [];
+    return EMPTY_AGENTS;
   }
   if (raw !== cachedAgentsRaw) {
     cachedAgentsRaw = raw;
@@ -149,11 +156,6 @@ export function setActiveAcpAgentId(id: string | null): void {
   }
   notify();
 }
-
-// A stable empty array for the SSR/no-`window` snapshot — a fresh `[]` there
-// would trip the same "getSnapshot should be cached" check `loadAcpAgents`
-// above is written to avoid.
-const EMPTY_AGENTS: AcpAgentConfig[] = [];
 
 /** Live list of configured agents — re-renders the caller when a `saveAcpAgents`
  *  write lands from ANYWHERE, including a sibling component. */

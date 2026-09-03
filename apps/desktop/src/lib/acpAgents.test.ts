@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   activeAcpAgent,
   activeAcpAgentId,
@@ -59,6 +59,27 @@ describe("configured ACP agents", () => {
     expect(newAcpAgentId([])).toBe("acp-1");
     expect(newAcpAgentId([codex])).toBe("acp-2");
     expect(newAcpAgentId([codex, { ...codex, id: "acp-2" }])).toBe("acp-3");
+  });
+
+  describe("when localStorage is unavailable", () => {
+    // `storage()` treats a throwing `window.localStorage` accessor as "no
+    // storage" — a browser with site data blocked, or an embedded webview
+    // with storage disabled, throws exactly this way. Stub the accessor
+    // itself (not e.g. `getItem`) so `loadAcpAgents` takes the `!store`
+    // branch, matching what `storage()` actually detects.
+    afterEach(() => vi.restoreAllMocks());
+
+    it("returns the same array reference across calls", () => {
+      vi.spyOn(window, "localStorage", "get").mockImplementation(() => {
+        throw new Error("storage blocked");
+      });
+      // `useSyncExternalStore` (AcpAgentsCard, InstalledClisCard) compares
+      // snapshots with `Object.is`. A fresh `[]` literal on every call reads
+      // as "changed" on every render and sends React into an infinite
+      // re-render loop that crashes the Settings route — regression guard
+      // for that crash, not just a value-equality check.
+      expect(Object.is(loadAcpAgents(), loadAcpAgents())).toBe(true);
+    });
   });
 });
 
