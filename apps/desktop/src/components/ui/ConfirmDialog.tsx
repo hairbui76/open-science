@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "./Button";
+import { Panel } from "./Panel";
 
 /**
  * Minimal in-app confirmation dialog. `window.confirm` is unreliable inside
@@ -33,33 +35,28 @@ export function ConfirmDialog({
       onClick={onCancel}
       role="presentation"
     >
-      <div
+      {/* Solid, never glass: a modal that lets the page show through is a
+          modal you can misread. */}
+      <Panel
         role="alertdialog"
         aria-label={title}
-        className="w-[360px] rounded-card border border-border bg-surface p-4 shadow-card"
+        className="w-[360px] p-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-sm font-medium text-text">{title}</div>
-        <p className="mt-1.5 text-sm text-muted">{body}</p>
+        <div className="text-sm font-medium text-text-strong">{title}</div>
+        <p className="mt-1.5 text-sm text-text-muted">{body}</p>
         {/* Destructive action on the left, Cancel on the right and focused by
             default — so the safe choice is where the primary button usually
             sits and Enter/Space never triggers the destructive one. */}
         <div className="mt-4 flex justify-end gap-2">
-          <button
-            className="rounded-input bg-error px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
-            onClick={onConfirm}
-          >
+          <Button variant="danger" onClick={onConfirm}>
             {confirmLabel}
-          </button>
-          <button
-            autoFocus
-            className="rounded-input border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-2"
-            onClick={onCancel}
-          >
+          </Button>
+          <Button autoFocus variant="secondary" onClick={onCancel}>
             {t("actions.cancel")}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { useTranslation } from "react-i18next";
 import { ChevronRight, FileSearch, FlaskConical, Globe2, LineChart } from "lucide-react";
 import { installExample, isTauri } from "@/lib/tauri";
 import { toast } from "@/lib/toast";
+import { Card } from "@/components/ui/Card";
+import { cn } from "@/lib/cn";
 
 export interface WorkflowStarter {
   id: string;
@@ -84,13 +86,13 @@ export function WorkflowStarters({ onPick }: { onPick: (prompt: string) => void 
           <div className="text-[10.5px] font-medium uppercase tracking-[0.2em] text-muted">
             {t("starters.newSession")}
           </div>
-          <h2 className="mt-2.5 font-serif text-[26px] leading-tight text-text">
+          <h2 className="mt-2.5 font-serif text-[26px] leading-tight text-text-strong">
             {t("starters.heading")}
           </h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">{t("starters.subheading")}</p>
         </div>
 
-        <div className="mt-7 overflow-hidden rounded-card border border-border bg-surface shadow-card">
+        <Card raised className="mt-7 overflow-hidden">
           {WORKFLOW_STARTERS.map((s) => (
             <button
               key={s.id}
@@ -109,9 +111,16 @@ export function WorkflowStarters({ onPick }: { onPick: (prompt: string) => void 
                   onPick(s.prompt);
                 })();
               }}
-              className="group flex w-full items-center gap-3.5 border-t border-border px-4 py-3.5 text-left transition-colors first:border-t-0 hover:bg-surface-2"
+              className={cn(
+                "group flex w-full items-center gap-3.5 border-t border-faint px-4 py-3.5 text-left",
+                "transition-colors duration-quick ease-standard first:border-t-0 hover:bg-fill-3",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-border-selected",
+              )}
             >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-surface-2 text-accent ring-1 ring-border transition-colors group-hover:bg-surface">
+              {/* Ink, deliberately: four starters are four suggestions, and the
+                  brand pop is worth exactly one element on a screen — spending
+                  it four times over would say nothing. */}
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-pill bg-surface-2 text-accent ring-1 ring-border transition-colors duration-quick ease-standard group-hover:bg-surface">
                 {s.icon}
               </span>
               <span className="min-w-0 flex-1">
@@ -124,11 +133,11 @@ export function WorkflowStarters({ onPick }: { onPick: (prompt: string) => void 
               </span>
               <ChevronRight
                 size={16}
-                className="shrink-0 text-muted/60 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-muted"
+                className="shrink-0 text-text-faint transition-transform duration-enter ease-standard group-hover:translate-x-0.5 group-hover:text-muted"
               />
             </button>
           ))}
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -138,7 +138,9 @@ function Collapse({ open, children }: { open: boolean; children: React.ReactNode
   return (
     <div
       className={cn(
-        "grid transition-[grid-template-rows] duration-300 ease-out",
+        // duration-slow is 300ms — the same figure the unmount timeout above
+        // waits out, so the two stay in step through the token.
+        "grid transition-[grid-template-rows] duration-slow ease-enter",
         shown ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
       )}
     >
@@ -266,7 +268,11 @@ const ToolRow = memo(function ToolRow({
         }
         className={cn(
           "group flex items-center gap-2 rounded-input px-2 py-1 text-[12.5px]",
-          activate && "cursor-pointer hover:bg-surface-2",
+          "transition-colors duration-quick ease-standard",
+          // fill-3, the subtlest rung: hundreds of these rows share a scroller,
+          // and anything heavier turns pointer movement into a light show.
+          activate &&
+            "cursor-pointer hover:bg-fill-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-selected",
         )}
       >
         <span className={cn("shrink-0", s.className)} aria-label={t(`tool.status.${block.status}`)} role="img">
@@ -283,7 +289,7 @@ const ToolRow = memo(function ToolRow({
           <ChevronRight
             size={12}
             className={cn(
-              "shrink-0 text-muted transition-transform duration-200",
+              "shrink-0 text-muted transition-transform duration-enter ease-standard",
               open && "rotate-90",
               !open && "opacity-0 group-hover:opacity-100",
             )}
@@ -382,14 +388,21 @@ export function ToolGroup({
       <button
         type="button"
         onClick={() => setUserOpen(!open)}
-        className="group flex w-full items-center gap-2 rounded-input px-2 py-1 text-left text-[12.5px] text-muted hover:bg-surface-2 hover:text-text"
+        className={cn(
+          "group flex w-full items-center gap-2 rounded-input px-2 py-1 text-left text-[12.5px] text-muted",
+          "transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-selected",
+        )}
       >
         {active ? (
           <RunningDot className="text-accent" />
         ) : (
           <ChevronRight
             size={13}
-            className={cn("shrink-0 transition-transform duration-200", open && "rotate-90")}
+            className={cn(
+              "shrink-0 transition-transform duration-enter ease-standard",
+              open && "rotate-90",
+            )}
           />
         )}
         <span className="min-w-0 truncate">{summarizeGroup(blocks)}</span>

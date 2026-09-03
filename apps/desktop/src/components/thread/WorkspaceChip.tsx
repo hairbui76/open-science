@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import i18n from "@/i18n";
 import { isTauri, pickFolder } from "@/lib/tauri";
 import { datedWorkspaceName, DRAFT_KEY, useRuntimeStore } from "@/lib/runtime";
+import { Chip } from "@/components/ui/Chip";
 
 /** Last path segment of the workspace folder, or "Workspace" when unknown. */
 export function baseName(path: string | null): string {
@@ -48,8 +49,8 @@ export function WorkspaceChip({ draftKey = DRAFT_KEY }: { draftKey?: string }) {
   };
 
   return (
-    <button
-      className="flex items-center gap-1 rounded-input px-1.5 py-1 text-xs text-muted hover:bg-surface-2 hover:text-text disabled:opacity-60"
+    <Chip
+      className="gap-1"
       onClick={() => void choose()}
       disabled={busy || sending}
       title={
@@ -65,6 +66,6 @@ export function WorkspaceChip({ draftKey = DRAFT_KEY }: { draftKey?: string }) {
       ) : (
         aimed && <span className="max-w-[200px] truncate">{baseName(aimed)}</span>
       )}
-    </button>
+    </Chip>
   );
 }

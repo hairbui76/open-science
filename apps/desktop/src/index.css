@@ -1,3 +1,9 @@
+/* UI sans is Albert Sans (SIL OFL), bundled offline like the others. Inter is
+   kept as the first fallback so a missing face degrades to the old look rather
+   than to a system default. */
+@import "@fontsource/albert-sans/400.css";
+@import "@fontsource/albert-sans/500.css";
+@import "@fontsource/albert-sans/600.css";
 @import "@fontsource/inter/400.css";
 @import "@fontsource/inter/500.css";
 @import "@fontsource/inter/600.css";
@@ -16,27 +22,74 @@
    to stay pinned to the lights at every zoom level. */
 :root {
   --zoom: 1;
+
+  /* Motion scale. Theme-independent, so it lives here rather than in each
+     palette. Surfaced through Tailwind as duration-quick/base/enter/slow and
+     ease-enter/ease-standard (tailwind.config.js). */
+  --dur-quick: 100ms;
+  --dur: 150ms;
+  --dur-enter: 200ms;
+  --dur-slow: 300ms;
+  --ease-out: cubic-bezier(0, 0, 0, 1);
+  --ease: cubic-bezier(0.33, 0, 0.67, 1);
 }
 
-/* Warm — the original paper palette, and the default theme. */
+/* Warm — the original paper palette, and the default theme.
+
+   Structure follows the OpenDesign port (see ROADMAP.md): neutrals carry the
+   whole interface, --accent is INK and is what controls are made of, and the
+   brand hue appears only as a sparse pop (selected state, one CTA per screen).
+   Terracotta therefore moved from --accent to --brand; nothing was renamed or
+   removed, so every existing call site still resolves. */
 :root,
 [data-theme="warm"] {
+  /* Ground -> floating panel -> card. --panel is a step LIGHTER than --bg so a
+     floating rail or toolbar reads as lifted off the page rather than painted
+     onto it; --surface stays the flat card white. */
   --bg: #f7f5ef;
+  --panel: #fffdf7;
   --surface: #ffffff;
   --surface-2: #f2efe7;
-  --border: #e7e3da;
+
   --border-faint: #efece5;
+  --border: #e7e3da;
+  --border-strong: #cfc9bd;
+  --border-selected: #a8a196;
+
+  --text-strong: #201d19;
   --text: #2a2723;
+  --text-muted: #5c574f;
   --muted: #8c877d;
-  --accent: #c15f3c;
-  --accent-fg: #ffffff;
+  --text-faint: #b8b2a6;
+
+  /* Ink accent: buttons, active controls, focus fills. */
+  --accent: #2f2c28;
+  --accent-fg: #fdfcf9;
+  /* Brand pop — use sparingly. Selected chip, one primary CTA. */
+  --brand: #c15f3c;
+  --brand-fg: #ffffff;
+  --brand-soft: #f6e6df;
+  --brand-text: #8a3d23;
+
+  /* Hover / press ladder, replacing ad-hoc hover:bg-surface-2 in migrated UI. */
+  --fill-3: rgba(42, 39, 35, 0.03);
+  --fill-2: rgba(42, 39, 35, 0.06);
+  --fill: rgba(42, 39, 35, 0.12);
+
+  /* Frosted material for floating layers. Panel composes this behind an
+     @supports guard; where backdrop-filter is unavailable the surface falls
+     back to a solid --panel, never to something unreadable. */
+  --glass: color-mix(in srgb, var(--panel) 66%, transparent);
+  --glass-blur: 28px;
+
   --link: #2a6fdb;
   --warn: #c98a2b;
   --ok: #4b8b5b;
-  --error: #c0564b;
-  /* Chart design system (P1-5) — validated categorical hues + chart chrome,
-     the single source of truth shared with @ai4s/shared and the matplotlib
-     style. Light surface = --surface (#ffffff). */
+  /* Deliberately crimson, not terracotta: --brand is terracotta, and a
+     destructive control sharing its hue reads as the primary one. */
+  --error: #b0302c;
+  --error-fg: #ffffff;
+
   --series-1: #2a78d6;
   --series-2: #1baf7a;
   --series-3: #eda100;
@@ -61,23 +114,48 @@
   --hl-deletion-bg: #ffebe9;
 }
 
-/* Light — clean white with neutral (cool) grays and a blue accent (the warm
-   terracotta belongs to the warm theme); same chart hues as warm since both
-   sit on a white chart surface. */
+/* Light — clean white-on-grey. The former blue accent retires to --link only;
+   controls are ink here too, and the brand pop stays terracotta so the product
+   reads the same across themes. */
 [data-theme="light"] {
-  --bg: #ffffff;
+  --bg: #f1f1f4;
+  --panel: #ffffff;
   --surface: #ffffff;
   --surface-2: #f4f4f6;
-  --border: #e6e6ea;
+
   --border-faint: #f0f0f3;
+  --border: #e6e6ea;
+  --border-strong: #cdcdd4;
+  --border-selected: #a3a3ad;
+
+  --text-strong: #131317;
   --text: #1f1f24;
+  --text-muted: #55555e;
   --muted: #8a8a93;
-  --accent: #2563eb;
-  --accent-fg: #ffffff;
+  --text-faint: #b4b4bd;
+
+  --accent: #24242a;
+  --accent-fg: #fbfbfc;
+  --brand: #c15f3c;
+  --brand-fg: #ffffff;
+  --brand-soft: #fbeae3;
+  --brand-text: #8a3d23;
+
+  --fill-3: rgba(20, 20, 26, 0.03);
+  --fill-2: rgba(20, 20, 26, 0.06);
+  --fill: rgba(20, 20, 26, 0.12);
+
+  --glass: color-mix(in srgb, var(--panel) 66%, transparent);
+  --glass-blur: 28px;
+
   --link: #2a6fdb;
   --warn: #c98a2b;
   --ok: #4b8b5b;
-  --error: #c0564b;
+  /* Deliberately crimson, not terracotta: --brand is terracotta, and a
+     destructive control sharing its hue reads as the primary one. */
+  --error: #b0302c;
+  --error-fg: #ffffff;
+
   --series-1: #2a78d6;
   --series-2: #1baf7a;
   --series-3: #eda100;
@@ -102,22 +180,48 @@
   --hl-deletion-bg: #ffebe9;
 }
 
-/* Dark — neutral-cool like light, so it shares light's blue accent (stepped
-   up for the dark surface; dark text on the filled accent keeps contrast). */
+/* Dark — inverted ink: --accent is near-white and --accent-fg is the ground,
+   so a filled control is a light chip on a dark surface (the same shape logic
+   as warm/light, mirrored). --panel is lighter than --bg for the same float. */
 [data-theme="dark"] {
   --bg: #16151a;
+  --panel: #201f26;
   --surface: #1e1d24;
   --surface-2: #26252d;
-  --border: #33313c;
+
   --border-faint: #25242b;
+  --border: #33313c;
+  --border-strong: #474552;
+  --border-selected: #6b6879;
+
+  --text-strong: #f7f5f0;
   --text: #ece9e2;
+  --text-muted: #b5b0a7;
   --muted: #9a958c;
-  --accent: #4d9df6;
+  --text-faint: #6f6b64;
+
+  --accent: #ece9e2;
   --accent-fg: #16151a;
+  --brand: #d9784f;
+  /* Dark's brand fill is light-toned, so its label is the ground colour. */
+  --brand-fg: #201d19;
+  --brand-soft: #3a2620;
+  --brand-text: #f0b79e;
+
+  --fill-3: rgba(255, 255, 255, 0.04);
+  --fill-2: rgba(255, 255, 255, 0.08);
+  --fill: rgba(255, 255, 255, 0.16);
+
+  --glass: color-mix(in srgb, var(--panel) 66%, transparent);
+  --glass-blur: 28px;
+
   --link: #7aa5f0;
   --warn: #d7a24a;
   --ok: #6bb07d;
-  --error: #d47a70;
+  /* See warm: kept clear of --brand so danger never reads as primary. */
+  --error: #ef6a63;
+  --error-fg: #201d19;
+
   /* Same hues stepped for the dark chart surface (--surface #1e1d24). */
   --series-1: #3987e5;
   --series-2: #199e70;
@@ -172,7 +276,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: "Albert Sans", Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -216,6 +320,33 @@ body {
 }
 [data-vibrancy][data-theme="dark"] .sidebar-surface {
   background: color-mix(in srgb, var(--bg) 80%, transparent);
+}
+
+/* Touch targets. The desktop pill sizes (28px sm, 36px md) are right for a
+   mouse but under every touch guideline, and the same UI is served to phones
+   through the gateway web client. Grown only for coarse pointers, so desktop
+   density is untouched. */
+@media (pointer: coarse) {
+  [data-ui-control] {
+    min-height: 40px;
+    min-width: 40px;
+  }
+}
+
+/* Frosted material for floating chrome (components/ui/Panel with glass).
+   The solid --panel is the BASE rule and the blur is an enhancement inside
+   @supports: an engine without backdrop-filter that still applied the
+   translucent --glass would show page content straight through the panel's
+   own text. The fallback is opaque, never merely un-blurred. */
+.panel-glass {
+  background: var(--panel);
+}
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .panel-glass {
+    background: var(--glass);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+  }
 }
 
 /* Native <select> chrome (metallic bezel + arrow) clashes with the flat

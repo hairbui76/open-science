@@ -18,6 +18,7 @@ mod preview_server;
 mod project;
 mod provenance;
 mod acp;
+mod agent_cli;
 mod runs;
 mod runs_index;
 mod runtime;
@@ -229,6 +230,7 @@ pub fn run() {
             acp::acp_send,
             acp::acp_stop,
             acp::acp_running,
+            agent_cli::detect_agent_clis,
             modal::modal_status,
             preview_server::preview_url,
             large_file::probe_large_file,

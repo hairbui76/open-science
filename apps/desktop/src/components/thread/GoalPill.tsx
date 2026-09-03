@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Pause, Play, Target, X } from "lucide-react";
 import { goalState, goalUpdate, type GoalState } from "@/lib/tauri";
+import { Panel } from "@/components/ui/Panel";
 import { cn } from "@/lib/cn";
 
 /** How often the pill re-reads the plugin's state file while a session is
@@ -167,15 +168,21 @@ export function GoalPill({
     .join("\n");
 
   const dotClass = cn(
-    status === "active" && "text-accent",
+    // Brand, not ink: after the accent flip an "active" goal in ink was the
+    // same neutral as a paused one, and the dot is the only thing carrying the
+    // distinction in compact mode.
+    status === "active" && "text-brand",
     status === "unmet" && "text-error",
     limited && "text-warn",
     status === "complete" && "text-ok",
     !["active", "unmet", "complete"].includes(status) && !limited && "text-muted",
   );
   const shellClass = cn(
-    "flex min-w-0 shrink items-center rounded-full border text-xs",
-    status === "active" && "border-accent/30 bg-accent/10 text-text",
+    "flex min-w-0 shrink items-center rounded-pill border text-xs",
+    "transition-colors duration-quick ease-standard",
+    // "Currently running" is a selected state, which is the one place the brand
+    // tint is routine — it also keeps active readably apart from paused.
+    status === "active" && "border-transparent bg-brand-soft text-text",
     status === "unmet" && "border-error/30 bg-error/10 text-text",
     limited && "border-warn/30 bg-warn/10 text-text",
     status === "complete" && "border-ok/30 bg-ok/10 text-text",
@@ -192,7 +199,7 @@ export function GoalPill({
           disabled={busy}
           aria-label={status === "active" ? t("goal.pauseAria") : t("goal.resumeAria")}
           title={status === "active" ? t("goal.pauseAria") : t("goal.resumeAria")}
-          className="shrink-0 rounded-full p-1 text-muted transition-colors hover:bg-surface hover:text-text"
+          className="shrink-0 rounded-pill p-1 text-muted transition-colors duration-quick ease-standard hover:bg-fill-2 hover:text-text"
         >
           {status === "active" ? <Pause size={11} /> : <Play size={11} />}
         </button>
@@ -202,7 +209,7 @@ export function GoalPill({
         disabled={busy}
         aria-label={t("goal.clearAria")}
         title={t("goal.clearAria")}
-        className="shrink-0 rounded-full p-1 text-muted transition-colors hover:bg-surface hover:text-error"
+        className="shrink-0 rounded-pill p-1 text-muted transition-colors duration-quick ease-standard hover:bg-fill-2 hover:text-error"
       >
         <X size={11} />
       </button>
@@ -222,7 +229,7 @@ export function GoalPill({
           <Target size={12} className={cn("shrink-0", dotClass)} />
           {status === "active" && (
             <span
-              className="absolute right-0 top-0 h-1.5 w-1.5 animate-pulse rounded-full bg-accent"
+              className="absolute right-0 top-0 h-1.5 w-1.5 animate-pulse rounded-full bg-brand"
               aria-hidden
             />
           )}
@@ -230,26 +237,28 @@ export function GoalPill({
         {open &&
           typeof document !== "undefined" &&
           createPortal(
-            <div
+            <Panel
+              glass
               ref={popRef}
               role="dialog"
               style={{ top: pop?.top ?? 0, left: pop?.left ?? 0 }}
               className={cn(
-                "fixed z-[60] max-h-[50vh] w-[min(16rem,calc(100vw-16px))] overflow-y-auto rounded-card",
-                "border border-border bg-surface p-2 text-xs shadow-pop",
+                "fixed z-[60] max-h-[50vh] w-[min(16rem,calc(100vw-16px))] overflow-y-auto p-2 text-xs",
                 // Hidden until placed, so it never paints at the top-left corner.
                 !pop && "invisible",
               )}
             >
               <div className="mb-1 flex items-center gap-1.5">
                 <Target size={12} className={cn("shrink-0", dotClass)} />
-                <span className={cn("shrink-0", status === "active" ? "text-accent" : "text-muted")}>
+                <span
+                  className={cn("shrink-0", status === "active" ? "text-brand-text" : "text-muted")}
+                >
                   {statusLabel}
                 </span>
                 <span className="ml-auto flex items-center">{controls}</span>
               </div>
               <p className="whitespace-pre-wrap break-words text-text">{goal.objective}</p>
-            </div>,
+            </Panel>,
             document.body,
           )}
       </div>
@@ -263,13 +272,13 @@ export function GoalPill({
       <span
         className={cn(
           "shrink-0 whitespace-nowrap",
-          status === "active" ? "text-accent" : "text-muted",
+          status === "active" ? "text-brand-text" : "text-muted",
         )}
       >
         {statusLabel}
       </span>
       {status === "active" && (
-        <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
+        <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-brand" aria-hidden />
       )}
       {controls}
     </div>

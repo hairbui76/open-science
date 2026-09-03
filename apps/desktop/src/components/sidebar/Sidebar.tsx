@@ -48,6 +48,9 @@ import { startPaneDrag } from "@/lib/dragPane";
 import { isGatewayWeb } from "@/lib/webMode";
 import { pathKey, samePath } from "@/lib/workspacePath";
 import { StatusPills } from "./StatusPills";
+import { Button, IconButton } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Panel } from "@/components/ui/Panel";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   ContextMenu,
@@ -464,13 +467,17 @@ export function Sidebar({ project }: { project: Project }) {
           }
         }}
         className={cn(
-          // The selected row was only a shade of the hover background, which
-          // several themes made near-invisible (#63): give it the accent tint,
-          // an inset accent ring and medium weight so it reads at a glance.
-          "flex items-center gap-2 rounded-input py-1 pl-2 pr-8 text-[13px] hover:bg-surface-2",
+          "flex items-center gap-2 rounded-input py-1 pl-2 pr-8 text-[13px]",
+          "transition-colors duration-quick ease-standard",
+          // The selected row was once only a shade of the hover background,
+          // which several themes made near-invisible (#63). It is now the one
+          // brand element the rail allows itself: a soft terracotta tint plus
+          // medium weight names it at a glance without a ring shouting over
+          // the list. Ink would put it back in the hover family it has to be
+          // distinguishable from.
           location.pathname === row.to
-            ? "bg-accent/15 font-medium text-text ring-1 ring-inset ring-accent/40"
-            : "text-text/90",
+            ? "bg-brand-soft font-medium text-brand-text"
+            : "text-text hover:bg-fill-3",
         )}
       >
         {running ? (
@@ -500,18 +507,18 @@ export function Sidebar({ project }: { project: Project }) {
           {row.title}
         </span>
         {row.kind === "example" && (
-          <span className="shrink-0 rounded-full bg-surface-2 px-1.5 text-[10px] uppercase tracking-wide text-muted ring-1 ring-border">
+          <span className="shrink-0 rounded-pill bg-fill-2 px-1.5 text-[10px] uppercase tracking-wide text-text-muted ring-1 ring-faint">
             {t("history.exampleTag")}
           </span>
         )}
       </NavLink>
-      <button
+      <IconButton
         onClick={() => setPendingDelete(row)}
-        aria-label={t("history.deleteAria", { title: row.title })}
-        className="absolute right-1.5 top-1/2 hidden -translate-y-1/2 rounded p-1 text-muted hover:bg-border hover:text-error group-hover:block"
+        label={t("history.deleteAria", { title: row.title })}
+        className="absolute right-1.5 top-1/2 hidden h-6 w-6 -translate-y-1/2 hover:bg-fill-2 hover:text-error group-hover:inline-flex"
       >
         <Trash2 size={13} />
-      </button>
+      </IconButton>
     </div>
     </ContextMenu>
     );
@@ -521,8 +528,13 @@ export function Sidebar({ project }: { project: Project }) {
     <div
       className={cn(
         "relative h-full overflow-hidden",
-        isMobile ? "fixed inset-y-0 left-0 z-40 shadow-2xl" : "shrink-0",
-        !dragging && "transition-[width,transform] duration-200 ease-out",
+        isMobile ? "fixed inset-y-0 left-0 z-40" : "shrink-0",
+        // The lift lives on the wrapper, not on the <aside>: the wrapper clips
+        // its children so the collapse animation can shrink the rail to zero,
+        // which would swallow a shadow drawn inside it. Dropped while collapsed
+        // — a zero-width box still casts one, as a smear down the window edge.
+        drawerOpen && "shadow-lift",
+        !dragging && "transition-[width,transform] duration-enter ease-enter",
       )}
       style={
         isMobile
@@ -534,7 +546,18 @@ export function Sidebar({ project }: { project: Project }) {
         // `select-none`: the rail is chrome, so a right-click (or a sloppy drag)
         // must not leave its labels highlighted. Inline rename inputs opt back
         // in via the global rule in index.css.
-        className="sidebar-surface flex h-full select-none flex-col border-r border-border"
+        className={cn(
+          "sidebar-surface flex h-full select-none flex-col border-r border-border",
+          // Floating-rail ground: --panel is a step lighter than the --bg the
+          // pane area sits on, which is what makes the rail read as lifted.
+          // Scoped to windows WITHOUT vibrancy on purpose — under vibrancy the
+          // `[data-vibrancy] .sidebar-surface` rule in index.css paints a
+          // translucent --bg tint so the macOS material shows through, and it
+          // is declared after @tailwind utilities, so a plain `bg-panel` would
+          // lose everywhere and a `!bg-panel` would win everywhere and kill the
+          // translucency. This variant simply does not match when vibrancy is on.
+          "[html:not([data-vibrancy])_&]:bg-panel",
+        )}
         style={{ width: railWidth }}
       >
         {/* The strip clears the traffic lights and hosts the collapse button just
@@ -546,27 +569,29 @@ export function Sidebar({ project }: { project: Project }) {
             className="flex shrink-0 items-center"
           >
             {!inSettings && (
-              <button
+              <IconButton
+                size="sm"
                 onClick={toggleSidebar}
-                aria-label={t("sidebar.collapse")}
+                label={t("sidebar.collapse")}
                 title={t("sidebar.collapseTitle", { shortcut: "⌘B" })}
-                className="rounded p-1 text-text hover:bg-surface-2"
               >
                 <PanelLeft size={14} strokeWidth={1.5} />
-              </button>
+              </IconButton>
             )}
           </div>
         )}
         {inSettings && (
           <>
             <div className={cn("px-3 pb-2", overlayTitlebar ? "pt-0" : "pt-3")}>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => navigate("/live")}
-                className="flex w-full items-center gap-2 rounded-input px-2 py-1.5 text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                className="w-full justify-start gap-2 px-2 text-[13px]"
               >
                 <ArrowLeft size={15} />
                 {t("settings:nav.back")}
-              </button>
+              </Button>
             </div>
             <nav className="flex flex-col gap-0.5 px-3">
               {visibleSections(isGatewayWeb).map(({ key, icon: Icon }) => (
@@ -575,12 +600,19 @@ export function Sidebar({ project }: { project: Project }) {
                   to={`/settings/${key}`}
                   className={cn(
                     "flex items-center gap-2 rounded-input px-2 py-1.5 text-[13px]",
+                    "transition-colors duration-quick ease-standard",
+                    // Same "this is the one you are on" treatment as a selected
+                    // session row. The two branches are mutually exclusive, so
+                    // the rail still shows at most one brand element at a time.
                     activeSection === key
-                      ? "bg-surface-2 text-text"
-                      : "text-text/90 hover:bg-surface-2",
+                      ? "bg-brand-soft font-medium text-brand-text"
+                      : "text-text hover:bg-fill-3",
                   )}
                 >
-                  <Icon size={15} className={activeSection === key ? "text-text" : "text-muted"} />
+                  <Icon
+                    size={15}
+                    className={activeSection === key ? "text-brand-text" : "text-muted"}
+                  />
                   {t(`settings:nav.${key}`)}
                 </NavLink>
               ))}
@@ -605,16 +637,17 @@ export function Sidebar({ project }: { project: Project }) {
               </div>
             </button>
             {!overlayTitlebar && (
-              <button
+              <IconButton
+                size="sm"
                 onClick={toggleSidebar}
-                aria-label={t("sidebar.collapse")}
+                label={t("sidebar.collapse")}
                 title={t("sidebar.collapseTitle", {
                   shortcut: isMac ? "⌘B" : "Ctrl+B",
                 })}
-                className="ml-auto self-center rounded p-1 text-text hover:bg-surface-2"
+                className="ml-auto self-center"
               >
                 <PanelLeft size={14} strokeWidth={1.5} />
-              </button>
+              </IconButton>
             )}
           </div>
         </div>
@@ -659,7 +692,8 @@ export function Sidebar({ project }: { project: Project }) {
               onClick={() => navigate("/projects")}
               title={t("projects.seeAll")}
               className={cn(
-                "group/head flex min-w-0 flex-1 items-center gap-1.5 rounded-input px-1.5 py-1 text-[13px] font-medium outline-none hover:bg-surface-2",
+                "group/head flex min-w-0 flex-1 items-center gap-1.5 rounded-input px-1.5 py-1 text-[13px] font-medium outline-none",
+                "transition-colors duration-quick ease-standard hover:bg-fill-3",
                 location.pathname === "/projects" ? "text-text" : "text-muted hover:text-text",
               )}
             >
@@ -670,33 +704,29 @@ export function Sidebar({ project }: { project: Project }) {
             {/* Creating/importing a project needs local FS access — hidden in web. */}
             <DropdownMenu.Root>
               <DropdownMenu.Trigger asChild>
-                <button
-                  aria-label={t("projects.new")}
-                  title={t("projects.new")}
-                  className={cn(
-                    "rounded p-0.5 text-muted outline-none hover:bg-surface-2 hover:text-text",
-                    isGatewayWeb && "hidden",
-                  )}
+                <IconButton
+                  label={t("projects.new")}
+                  className={cn("h-6 w-6", isGatewayWeb && "hidden")}
                 >
                   <Plus size={13} />
-                </button>
+                </IconButton>
               </DropdownMenu.Trigger>
               <DropdownMenu.Portal>
                 <DropdownMenu.Content
                   align="end"
                   sideOffset={6}
-                  className="z-50 min-w-[210px] rounded-card border border-border bg-surface p-1 text-[13px] text-text shadow-pop"
+                  className="z-50 min-w-[210px] rounded-card border border-border bg-panel p-1 text-[13px] text-text shadow-pop"
                 >
                   <DropdownMenu.Item
                     onSelect={() => setNamingProject(true)}
-                    className="flex cursor-pointer items-center gap-2 rounded-input px-2 py-1.5 outline-none data-[highlighted]:bg-surface-2"
+                    className="flex cursor-pointer items-center gap-2 rounded-input px-2 py-1.5 outline-none data-[highlighted]:bg-fill-2"
                   >
                     <Plus size={14} className="shrink-0 text-muted" />
                     <span className="truncate">{t("projects.menuScratch")}</span>
                   </DropdownMenu.Item>
                   <DropdownMenu.Item
                     onSelect={() => void handleImport()}
-                    className="flex cursor-pointer items-center gap-2 rounded-input px-2 py-1.5 outline-none data-[highlighted]:bg-surface-2"
+                    className="flex cursor-pointer items-center gap-2 rounded-input px-2 py-1.5 outline-none data-[highlighted]:bg-fill-2"
                   >
                     <FolderInput size={14} className="shrink-0 text-muted" />
                     <span className="truncate">{t("projects.menuExisting")}</span>
@@ -731,7 +761,7 @@ export function Sidebar({ project }: { project: Project }) {
           {projects.length === 0 && !namingProject && (
             <button
               onClick={() => setNamingProject(true)}
-              className="flex w-full items-center gap-2 rounded-input px-2 py-1 text-[13px] text-muted hover:bg-surface-2 hover:text-text"
+              className="flex w-full items-center gap-2 rounded-input px-2 py-1 text-[13px] text-muted transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text"
             >
               <Folder size={14} className="shrink-0" />
               <span className="truncate">{t("projects.new")}</span>
@@ -798,12 +828,12 @@ export function Sidebar({ project }: { project: Project }) {
                     <button
                       onClick={() => toggleProject(p.id)}
                       aria-expanded={open}
-                      className="flex w-full items-center gap-1.5 rounded-input py-1 pl-1 pr-10 text-[13px] text-text hover:bg-surface-2"
+                      className="flex w-full items-center gap-1.5 rounded-input py-1 pl-1 pr-10 text-[13px] text-text transition-colors duration-quick ease-standard hover:bg-fill-3 active:bg-fill-2"
                     >
                       <ChevronRight
                         size={11}
                         className={cn(
-                          "shrink-0 text-muted transition-transform duration-150",
+                          "shrink-0 text-muted transition-transform duration-base",
                           open && "rotate-90",
                         )}
                       />
@@ -836,7 +866,7 @@ export function Sidebar({ project }: { project: Project }) {
                       </span>
                       {p.imported && (
                         <span
-                          className="shrink-0 rounded bg-surface-2 px-1 text-[9px] uppercase tracking-wide text-muted"
+                          className="shrink-0 rounded-pill bg-fill-2 px-1.5 text-[9px] uppercase tracking-wide text-text-muted"
                           title={p.importedFrom ?? p.path}
                         >
                           {t("projects.importedBadge")}
@@ -850,16 +880,15 @@ export function Sidebar({ project }: { project: Project }) {
                         </span>
                       )}
                       {!webReadOnly && (
-                        <button
+                        <IconButton
                           onClick={() => void openProjectScreen(p)}
-                          aria-label={t("projects.newSessionAria", {
-                            name: p.name,
-                          })}
-                          title={t("projects.newSessionAria", { name: p.name })}
-                          className="hidden rounded p-1 text-muted hover:bg-border hover:text-text group-hover/project:block"
+                          label={t("projects.newSessionAria", { name: p.name })}
+                          // `inline-flex`, not `block`: the reveal has to restore
+                          // the flex box the icon is centred in.
+                          className="hidden h-6 w-6 group-hover/project:inline-flex"
                         >
                           <Plus size={13} />
-                        </button>
+                        </IconButton>
                       )}
                     </div>
                   </div>
@@ -867,7 +896,7 @@ export function Sidebar({ project }: { project: Project }) {
                 )}
                 <div
                   className={cn(
-                    "grid transition-[grid-template-rows] duration-200 ease-out",
+                    "grid transition-[grid-template-rows] duration-enter ease-enter",
                     open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
                   )}
                 >
@@ -895,7 +924,7 @@ export function Sidebar({ project }: { project: Project }) {
           {hiddenProjectCount > 0 && (
             <button
               onClick={() => navigate("/projects")}
-              className="flex w-full items-center gap-2 rounded-input px-2 py-1 pl-6 text-[13px] text-muted hover:bg-surface-2 hover:text-text"
+              className="flex w-full items-center gap-2 rounded-input px-2 py-1 pl-6 text-[13px] text-muted transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text"
             >
               <span className="truncate">{t("projects.seeAll")}</span>
               <span className="text-[10px] tabular-nums text-muted">+{hiddenProjectCount}</span>
@@ -911,7 +940,8 @@ export function Sidebar({ project }: { project: Project }) {
               onClick={() => navigate("/history")}
               title={t("history.seeAll")}
               className={cn(
-                "shrink-0 rounded px-1 text-[11px] outline-none hover:bg-surface-2 hover:text-text",
+                "shrink-0 rounded-pill px-1.5 text-[11px] outline-none",
+                "transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text",
                 location.pathname === "/history" ? "text-text" : "text-muted",
               )}
             >
@@ -934,19 +964,21 @@ export function Sidebar({ project }: { project: Project }) {
           {exampleRows.map(sessionRow)}
         </div>
 
-        <div className="border-t border-border px-3 py-3">
+        <div className="border-t border-faint px-3 py-3">
           <StatusPills />
           <button
-            className="relative mt-2 flex items-center gap-2 rounded-input px-2 py-1 text-[13px] text-muted hover:bg-surface-2 hover:text-text"
+            className="relative mt-2 flex items-center gap-2 rounded-input px-2 py-1 text-[13px] text-muted transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text"
             onClick={() => navigate("/settings")}
             aria-label={t("sidebar.settings")}
           >
             <Settings size={15} />
             <span>{t("sidebar.settings")}</span>
             {showUpdateBadge && (
+              // The halo has to match whatever the rail is painted on, which is
+              // --panel now (and was never the non-existent --color-surface).
               <span
                 aria-hidden="true"
-                className="ml-auto h-2 w-2 rounded-full bg-error shadow-[0_0_0_2px_var(--color-surface)]"
+                className="ml-auto h-2 w-2 rounded-full bg-error shadow-[0_0_0_2px_var(--panel)]"
               />
             )}
           </button>
@@ -1006,7 +1038,8 @@ export function Sidebar({ project }: { project: Project }) {
       >
         <div
           className={cn(
-            "absolute inset-y-0 right-0 w-[2px] transition-colors",
+            "absolute inset-y-0 right-0 w-[2px] transition-colors duration-quick ease-standard",
+            // Ink, not brand: a resize handle is plumbing, not a choice.
             dragging
               ? "bg-accent/60"
               : "bg-transparent group-hover:bg-accent/40",
@@ -1045,53 +1078,56 @@ function ImportProjectDialog({
       onClick={() => !busy && onCancel()}
       role="presentation"
     >
-      <div
+      <Panel
         role="dialog"
         aria-label={t("nav:projects.importTitle")}
-        className="w-[520px] max-w-[calc(100vw-2rem)] rounded-card border border-border bg-surface p-5 shadow-card"
+        className="w-[520px] max-w-[calc(100vw-2rem)] p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-base font-semibold text-text">{t("nav:projects.importTitle")}</div>
-        <p className="mt-1 text-sm text-muted">
+        <div className="text-base font-semibold text-text-strong">
+          {t("nav:projects.importTitle")}
+        </div>
+        <p className="mt-1 text-sm text-text-muted">
           {t("nav:projects.importSubtitle", { name })}
         </p>
         <div className="mt-4 grid gap-2">
+          {/* In-place is the recommended default, marked with the strong border
+              and a resting fill rather than the brand: nothing is selected yet,
+              the user is still choosing. */}
           <button
+            type="button"
             autoFocus
             disabled={busy}
             onClick={() => onImport("in-place")}
-            className="rounded-card border border-accent bg-surface-2 p-3 text-left hover:bg-surface disabled:opacity-50"
+            className="rounded-card border border-border-selected bg-fill-3 p-3 text-left transition-colors duration-quick ease-standard hover:bg-fill-2 disabled:opacity-50"
           >
-            <span className="block text-sm font-medium text-text">
+            <span className="block text-sm font-medium text-text-strong">
               {t("nav:projects.importInPlace")}
             </span>
-            <span className="mt-1 block text-xs leading-relaxed text-muted">
+            <span className="mt-1 block text-xs leading-relaxed text-text-muted">
               {t("nav:projects.importInPlaceHint")}
             </span>
           </button>
           <button
+            type="button"
             disabled={busy}
             onClick={() => onImport("copy")}
-            className="rounded-card border border-border p-3 text-left hover:bg-surface-2 disabled:opacity-50"
+            className="rounded-card border border-border p-3 text-left transition-colors duration-quick ease-standard hover:bg-fill-3 disabled:opacity-50"
           >
-            <span className="block text-sm font-medium text-text">
+            <span className="block text-sm font-medium text-text-strong">
               {t("nav:projects.importCopy")}
             </span>
-            <span className="mt-1 block text-xs leading-relaxed text-muted">
+            <span className="mt-1 block text-xs leading-relaxed text-text-muted">
               {t("nav:projects.importCopyHint")}
             </span>
           </button>
         </div>
         <div className="mt-4 flex justify-end">
-          <button
-            disabled={busy}
-            onClick={onCancel}
-            className="rounded-input border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-2 disabled:opacity-50"
-          >
+          <Button variant="secondary" size="sm" disabled={busy} onClick={onCancel}>
             {t("common:actions.cancel")}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
@@ -1109,7 +1145,7 @@ function MoreRow({
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-input py-1 pl-2 pr-2 text-[13px] text-muted hover:bg-surface-2 hover:text-text"
+      className="flex w-full items-center gap-2 rounded-input py-1 pl-2 pr-2 text-[13px] text-muted transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text"
     >
       <span className="truncate">{label}</span>
       <span className="ml-auto shrink-0 text-[10px] tabular-nums">+{count}</span>
@@ -1129,7 +1165,7 @@ function NavRow({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2 rounded-input px-2 py-1 text-[13px] text-text hover:bg-surface-2"
+      className="flex items-center gap-2 rounded-input px-2 py-1 text-[13px] text-text transition-colors duration-quick ease-standard hover:bg-fill-3 active:bg-fill-2"
     >
       <span className="text-text">{icon}</span>
       <span>{label}</span>
@@ -1158,7 +1194,7 @@ function InlineNameInput({
     ref.current?.select();
   }, []);
   return (
-    <input
+    <Input
       ref={ref}
       defaultValue={defaultValue}
       placeholder={placeholder}
@@ -1171,7 +1207,9 @@ function InlineNameInput({
         if (!busy) onCancel();
       }}
       className={cn(
-        "w-full min-w-0 rounded-input border border-accent/50 bg-surface px-2 py-[3px] text-[13px] text-text outline-none placeholder:text-muted focus:border-accent",
+        // Tighter than the field default — this one replaces a rail row in
+        // place, so it has to keep the row's height.
+        "min-w-0 border-border-strong px-2 py-[3px] text-[13px]",
         busy && "animate-pulse opacity-60",
       )}
     />
@@ -1214,15 +1252,15 @@ function NameProjectDialog({
       onClick={() => !busy && onCancel()}
       role="presentation"
     >
-      <div
+      <Panel
         role="dialog"
         aria-label={title}
-        className="w-[420px] max-w-[calc(100vw-2rem)] rounded-card border border-border bg-surface p-5 shadow-card"
+        className="w-[420px] max-w-[calc(100vw-2rem)] p-5"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="text-base font-semibold text-text">{title}</div>
-        <p className="mt-1 text-sm text-muted">{subtitle}</p>
-        <input
+        <div className="text-base font-semibold text-text-strong">{title}</div>
+        <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
+        <Input
           ref={ref}
           defaultValue={defaultName}
           placeholder={placeholder}
@@ -1231,28 +1269,19 @@ function NameProjectDialog({
             if (e.key === "Enter") save();
             else if (e.key === "Escape") onCancel();
           }}
-          className={cn(
-            "mt-4 w-full rounded-input border border-border bg-surface px-3 py-2 text-sm text-text outline-none placeholder:text-muted focus:border-accent",
-            busy && "animate-pulse opacity-60",
-          )}
+          className={cn("mt-4 py-2", busy && "animate-pulse opacity-60")}
         />
         <div className="mt-4 flex justify-end gap-2">
-          <button
-            className="rounded-input border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-2 disabled:opacity-50"
-            onClick={onCancel}
-            disabled={busy}
-          >
+          <Button variant="secondary" size="sm" onClick={onCancel} disabled={busy}>
             {t("actions.cancel")}
-          </button>
-          <button
-            className="rounded-input bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-            onClick={save}
-            disabled={busy}
-          >
+          </Button>
+          {/* Ink, not brand: an ordinary confirm. The rail's one brand slot is
+              the selected session row behind this dialog. */}
+          <Button variant="primary" size="sm" onClick={save} disabled={busy}>
             {t("actions.save")}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

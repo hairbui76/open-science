@@ -144,7 +144,7 @@ function QuestionCard({
                         "flex items-start gap-2.5 rounded-input border px-3 py-2 text-left transition-colors",
                         on
                           ? "border-accent bg-accent/10"
-                          : "border-border bg-surface hover:bg-surface-2",
+                          : "border-border bg-surface hover:bg-fill-3",
                       )}
                     >
                       <span
@@ -174,7 +174,7 @@ function QuestionCard({
                 {!it.custom && !ownWords[qi] && (
                   <button
                     onClick={() => openOwnWords(qi, multiple)}
-                    className="flex items-center gap-2.5 rounded-input border border-dashed border-border px-3 py-2 text-left text-[13px] text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                    className="flex items-center gap-2.5 rounded-input border border-dashed border-border px-3 py-2 text-left text-[13px] text-muted transition-colors hover:bg-fill-3 hover:text-text"
                   >
                     <Pencil size={13} className="shrink-0" />
                     {t("interaction.question.other")}
@@ -256,7 +256,7 @@ function PermissionCard({
         </button>
         <div className="flex-1" />
         <button
-          className="rounded-input border border-border px-3 py-1.5 text-xs text-text hover:bg-surface-2"
+          className="rounded-input border border-border px-3 py-1.5 text-xs text-text hover:bg-fill-3"
           onClick={() => onReply(permission.requestId, "always")}
         >
           {t("interaction.alwaysAllow")}

@@ -37,6 +37,9 @@ import { ModelPicker } from "@/components/thread/ModelPicker";
 import { AcpConfigPicker } from "@/components/thread/AcpConfigPicker";
 import type { AcpConfigOption } from "@ai4s/sdk/acp";
 import { WorkspaceChip } from "@/components/thread/WorkspaceChip";
+import { Chip } from "@/components/ui/Chip";
+import { IconButton } from "@/components/ui/Button";
+import { Panel } from "@/components/ui/Panel";
 import { useUiStore } from "@/lib/store";
 import { parkDraft, unparkDraft } from "@/lib/composerStash";
 import { toast } from "@/lib/toast";
@@ -728,29 +731,34 @@ export function Composer({
     <div
       ref={rootRef}
       className={cn(
-        "relative rounded-card border bg-surface px-2 py-2 shadow-card",
+        // An elevated card on the page ground: the textarea sits flush inside
+        // it and the pill controls run along its bottom edge.
+        "relative rounded-card border bg-surface px-3 py-2.5 shadow-card",
+        "transition-colors duration-quick ease-standard",
         // Plan mode gets the blue link tone — distinct from shell (warn) and
-        // a chipped command (accent) — so a read-only turn is unmistakable.
+        // a chipped command (a stronger neutral) — so a read-only turn is
+        // unmistakable.
         shellMode
           ? "border-warn/60"
           : command
-            ? "border-accent/50"
+            ? "border-border-strong"
             : agentMode === "plan"
               ? "border-link/60"
               : "border-border",
         // Dragging a file over the window: highlight the composer as the target.
-        dragOver && "border-accent ring-2 ring-accent/40",
+        dragOver && "border-accent ring-2 ring-fill",
       )}
     >
       {refOpen && (
-        <div
+        <Panel
+          glass
           role="listbox"
           aria-label={
             trigger?.kind === "file"
               ? t("composer.reference.filesAria")
               : t("composer.reference.sessionsAria")
           }
-          className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-64 overflow-y-auto rounded-card border border-border bg-surface p-1 shadow-card"
+          className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-64 overflow-y-auto p-1"
         >
           {trigger?.kind === "file"
             ? fileMatches.map((path, i) => (
@@ -760,7 +768,7 @@ export function Composer({
                   aria-selected={i === refIndex}
                   className={cn(
                     "flex w-full items-baseline gap-2 rounded-input px-2 py-1.5 text-left",
-                    i === refIndex ? "bg-surface-2" : "hover:bg-surface-2",
+                    i === refIndex ? "bg-fill-2" : "hover:bg-fill-3",
                   )}
                   onMouseDown={(e) => {
                     e.preventDefault();
@@ -782,7 +790,7 @@ export function Composer({
                   aria-selected={i === refIndex}
                   className={cn(
                     "flex w-full items-baseline gap-2 rounded-input px-2 py-1.5 text-left",
-                    i === refIndex ? "bg-surface-2" : "hover:bg-surface-2",
+                    i === refIndex ? "bg-fill-2" : "hover:bg-fill-3",
                   )}
                   onMouseDown={(e) => {
                     e.preventDefault();
@@ -797,13 +805,14 @@ export function Composer({
               {t("composer.reference.scanning")}
             </div>
           )}
-        </div>
+        </Panel>
       )}
       {paletteOpen && (
-        <div
+        <Panel
+          glass
           role="listbox"
           aria-label={t("composer.commandsAria")}
-          className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-64 overflow-y-auto rounded-card border border-border bg-surface p-1 shadow-card"
+          className="absolute bottom-full left-0 right-0 z-20 mb-2 max-h-64 overflow-y-auto p-1"
         >
           {matches.map((c, i) => (
             <button
@@ -812,7 +821,7 @@ export function Composer({
               aria-selected={i === selIndex}
               className={cn(
                 "flex w-full items-baseline gap-2 rounded-input px-2 py-1.5 text-left",
-                i === selIndex ? "bg-surface-2" : "hover:bg-surface-2",
+                i === selIndex ? "bg-fill-2" : "hover:bg-fill-3",
               )}
               // mousedown, not click — a click would blur the textarea first.
               onMouseDown={(e) => {
@@ -831,19 +840,19 @@ export function Composer({
               )}
             </button>
           ))}
-        </div>
+        </Panel>
       )}
       {files.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-1 pb-2">
+        <div className="flex flex-wrap gap-1.5 pb-2">
           {files.map((name) => (
             <span
               key={name}
-              className="flex items-center gap-1.5 rounded-input bg-surface-2 py-1 pl-2 pr-1 font-mono text-xs text-text ring-1 ring-border"
+              className="flex items-center gap-1.5 rounded-pill border border-border bg-surface-2 py-1 pl-2.5 pr-1 font-mono text-xs text-text"
             >
               <Paperclip size={11} className="shrink-0 text-muted" />
               <span className="max-w-[220px] truncate">{name}</span>
               <button
-                className="rounded p-0.5 text-muted hover:bg-border hover:text-text"
+                className="rounded-pill p-0.5 text-muted hover:bg-fill-2 hover:text-text"
                 aria-label={t("composer.file.removeAria", { name })}
                 onClick={() => setFiles((f) => f.filter((n) => n !== name))}
               >
@@ -854,17 +863,17 @@ export function Composer({
         </div>
       )}
       {refSessions.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 px-1 pb-2">
+        <div className="flex flex-wrap gap-1.5 pb-2">
           {refSessions.map((r) => (
             <span
               key={r.id}
-              className="flex items-center gap-1.5 rounded-input bg-surface-2 py-1 pl-2 pr-1 text-xs text-text ring-1 ring-border"
+              className="flex items-center gap-1.5 rounded-pill border border-border bg-surface-2 py-1 pl-2.5 pr-1 text-xs text-text"
               title={t("composer.reference.chipTitle")}
             >
               <MessageSquare size={11} className="shrink-0 text-accent" />
               <span className="max-w-[220px] truncate">{r.title}</span>
               <button
-                className="rounded p-0.5 text-muted hover:bg-border hover:text-text"
+                className="rounded-pill p-0.5 text-muted hover:bg-fill-2 hover:text-text"
                 aria-label={t("composer.reference.removeAria", { title: r.title })}
                 onClick={() => setRefSessions((prev) => prev.filter((x) => x.id !== r.id))}
               >
@@ -895,7 +904,7 @@ export function Composer({
               : resolvedPlaceholder
         }
         className={cn(
-          "max-h-[160px] w-full resize-none bg-transparent px-1.5 py-0.5 text-sm leading-6 text-text outline-none placeholder:text-muted",
+          "max-h-[160px] w-full resize-none bg-transparent px-0.5 py-0.5 text-sm leading-6 text-text outline-none placeholder:text-muted",
           (shellMode || command) && "font-mono",
         )}
         aria-label={t("composer.placeholder.default")}
@@ -903,15 +912,15 @@ export function Composer({
       {/* Codex-style action row: mode controls bottom-left, send bottom-right.
           `flex-wrap` so a narrow (tiled) pane wraps the controls to a second
           line instead of overflowing outside the box. */}
-      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+      <div className="flex flex-wrap items-center gap-1.5 pt-2">
         {command ? (
           <span
-            className="flex h-7 shrink-0 items-center gap-1 rounded-input bg-accent/15 pl-2 pr-1 font-mono text-xs text-accent"
+            className="flex h-7 shrink-0 items-center gap-1 rounded-pill border border-border-strong bg-fill-2 pl-2.5 pr-1 font-mono text-xs text-text"
             title={t("composer.command.chipTitle")}
           >
             /{command}
             <button
-              className="rounded p-0.5 hover:bg-accent/20"
+              className="rounded-pill p-0.5 hover:bg-fill"
               aria-label={t("composer.command.removeAria")}
               onClick={unchip}
             >
@@ -920,7 +929,7 @@ export function Composer({
           </span>
         ) : shellMode ? (
           <span
-            className="flex h-7 shrink-0 items-center gap-1 rounded-input bg-warn/15 px-1.5 font-mono text-xs text-warn"
+            className="flex h-7 shrink-0 items-center gap-1 rounded-pill border border-warn/30 bg-warn/15 px-2.5 font-mono text-xs text-warn"
             title={t("composer.shellMode.title")}
           >
             <Terminal size={13} />
@@ -928,15 +937,17 @@ export function Composer({
           </span>
         ) : (
           canAttach && (
-            <button
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-input text-muted hover:bg-surface-2 hover:text-text disabled:opacity-40"
-              aria-label={t("composer.attach.addAria")}
+            <IconButton
+              size="sm"
+              // The tooltip names the action in fuller words than the label a
+              // screen reader reads out, so it is not the label verbatim.
+              label={t("composer.attach.addAria")}
               title={t("composer.attach.title")}
               onClick={() => void addFiles()}
               disabled={adding}
             >
               <Paperclip size={15} />
-            </button>
+            </IconButton>
           )
         )}
         {/* Folder picker for a fresh draft — renders nothing once the session
@@ -945,10 +956,11 @@ export function Composer({
         {agentMode && onAgentModeChange && (
           <div className="relative shrink-0" ref={agentRef}>
             {agentOpen && (
-              <div
+              <Panel
+                glass
                 role="menu"
                 aria-label={t("composer.agent.menuAria")}
-                className="absolute bottom-full left-0 z-20 mb-2 w-80 rounded-card border border-border bg-surface p-1 shadow-card"
+                className="absolute bottom-full left-0 z-20 mb-2 w-80 p-1"
               >
                 <div className="px-2 pb-1 pt-1.5 text-xs text-muted">
                   {t("composer.agent.menuTitle")}
@@ -958,7 +970,7 @@ export function Composer({
                     key={opt.mode}
                     role="menuitemradio"
                     aria-checked={opt.mode === agentMode}
-                    className="flex w-full items-start gap-2 rounded-input px-2 py-1.5 text-left hover:bg-surface-2"
+                    className="flex w-full items-start gap-2 rounded-input px-2 py-1.5 text-left hover:bg-fill-3"
                     // mousedown, not click — a click would blur the textarea first.
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -978,33 +990,34 @@ export function Composer({
                     )}
                   </button>
                 ))}
-              </div>
+              </Panel>
             )}
-            <button
+            <Chip
               aria-label={t("composer.agent.aria")}
               title={t("composer.agent.title")}
               className={cn(
-                "flex h-7 items-center rounded-full text-xs",
-                compactToolbar ? "gap-0.5 px-1.5" : "gap-1.5 px-2.5",
-                agentMode === "plan"
-                  ? "bg-link/15 text-link hover:bg-link/25"
-                  : "text-muted hover:bg-surface-2 hover:text-text",
+                compactToolbar && "gap-0.5 px-1.5",
+                // Plan keeps the link tone (read-only turn), not the brand tint:
+                // the brand belongs to the send CTA alone.
+                agentMode === "plan" &&
+                  "border-link/30 bg-link/15 text-link hover:bg-link/25 hover:text-link",
               )}
               onClick={() => setAgentOpen((o) => !o)}
             >
               {agentMode === "plan" ? <ClipboardList size={12} /> : <Hammer size={12} />}
               {!compactToolbar && <span>{agentCopy[agentMode].label}</span>}
               {!compactToolbar && <ChevronDown size={11} />}
-            </button>
+            </Chip>
           </div>
         )}
         {approvalMode && onApprovalModeChange && !isGatewayWeb && (
           <div className="relative shrink-0" ref={approvalRef}>
             {approvalOpen && (
-              <div
+              <Panel
+                glass
                 role="menu"
                 aria-label={t("composer.approval.menuAria")}
-                className="absolute bottom-full left-0 z-20 mb-2 w-80 rounded-card border border-border bg-surface p-1 shadow-card"
+                className="absolute bottom-full left-0 z-20 mb-2 w-80 p-1"
               >
                 <div className="px-2 pb-1 pt-1.5 text-xs text-muted">
                   {t("composer.approval.menuTitle")}
@@ -1014,7 +1027,7 @@ export function Composer({
                     key={opt.mode}
                     role="menuitemradio"
                     aria-checked={opt.mode === approvalMode}
-                    className="flex w-full items-start gap-2 rounded-input px-2 py-1.5 text-left hover:bg-surface-2"
+                    className="flex w-full items-start gap-2 rounded-input px-2 py-1.5 text-left hover:bg-fill-3"
                     // mousedown, not click — a click would blur the textarea first.
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -1034,21 +1047,18 @@ export function Composer({
                     )}
                   </button>
                 ))}
-              </div>
+              </Panel>
             )}
-            <button
+            <Chip
               aria-label={t("composer.approval.aria")}
               title={t("composer.approval.title")}
-              className={cn(
-                "flex h-7 items-center rounded-full text-xs text-muted hover:bg-surface-2 hover:text-text",
-                compactToolbar ? "gap-0.5 px-1.5" : "gap-1.5 px-2.5",
-              )}
+              className={cn(compactToolbar && "gap-0.5 px-1.5")}
               onClick={() => setApprovalOpen((o) => !o)}
             >
               {approvalMode === "full" ? <Zap size={12} /> : <Hand size={12} />}
               {!compactToolbar && <span>{approvalCopy[approvalMode].label}</span>}
               {!compactToolbar && <ChevronDown size={11} />}
-            </button>
+            </Chip>
           </div>
         )}
         {/* Model picker + send kept together, pushed right (and wrapping as a
@@ -1061,23 +1071,27 @@ export function Composer({
           {working && onStop ? (
             // Same spot, same shape, one action: the send button becomes Stop
             // while the agent works — always live, even though the input is not.
-            <button
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-input bg-accent text-accent-fg hover:opacity-90"
-              aria-label={t("composer.stop.aria")}
+            <IconButton
+              variant="brand"
+              size="sm"
+              label={t("composer.stop.aria")}
               title={t("composer.stop.title")}
               onClick={onStop}
             >
               <Square size={11} fill="currentColor" />
-            </button>
+            </IconButton>
           ) : (
-            <button
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-input bg-accent text-accent-fg hover:opacity-90 disabled:opacity-40"
-              aria-label={t("composer.send.aria")}
+            <IconButton
+              // The composer's single brand element: everything else on the row
+              // only modifies the turn this button starts.
+              variant="brand"
+              size="sm"
+              label={t("composer.send.aria")}
               onClick={submit}
               disabled={!canSend}
             >
               <ArrowUp size={15} />
-            </button>
+            </IconButton>
           )}
         </div>
       </div>

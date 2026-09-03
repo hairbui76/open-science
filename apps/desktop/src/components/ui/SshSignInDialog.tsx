@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, Loader2, Lock } from "lucide-react";
 import { useSshStore } from "@/lib/ssh";
-import { cn } from "@/lib/cn";
+import { Button, IconButton } from "./Button";
+import { Input } from "./Input";
+import { Panel } from "./Panel";
 
 /**
  * Sign-in for a compute host that authenticates interactively (#73) — a
@@ -64,24 +66,26 @@ export function SshSignInDialog() {
       role="presentation"
       onClick={() => void cancel()}
     >
-      <div
+      {/* Solid, never glass: a secret is typed here, and nothing of the page
+          behind may bleed through the field. */}
+      <Panel
         role="dialog"
         aria-label={t("ssh.title", { host })}
-        className="w-full max-w-[420px] rounded-card border border-border bg-surface p-4 shadow-card"
+        className="w-full max-w-[420px] p-4"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2">
-          <Lock size={14} className="shrink-0 text-muted" />
-          <div className="min-w-0 flex-1 truncate text-sm font-medium text-text">
+          <Lock size={14} className="shrink-0 text-text-muted" />
+          <div className="min-w-0 flex-1 truncate text-sm font-medium text-text-strong">
             {t("ssh.title", { host })}
           </div>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-muted">{t("ssh.hint")}</p>
+        <p className="mt-1 text-xs leading-relaxed text-text-muted">{t("ssh.hint")}</p>
 
         {/* What the server said around the question: banners, "Duo push sent",
             "Success. Logging you in…" — the context a terminal would show. */}
         {session?.notice && (
-          <pre className="mt-3 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-input bg-surface-2 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-muted">
+          <pre className="mt-3 max-h-24 overflow-auto whitespace-pre-wrap break-words rounded-input bg-surface-2 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-text-muted">
             {session.notice}
           </pre>
         )}
@@ -89,7 +93,7 @@ export function SshSignInDialog() {
         {failed ? (
           <p className="mt-3 text-[13px] text-error">{session?.error || t("ssh.failed")}</p>
         ) : waiting ? (
-          <div className="mt-3 flex items-center gap-2 text-[13px] text-muted">
+          <div className="mt-3 flex items-center gap-2 text-[13px] text-text-muted">
             <Loader2 size={13} className="animate-spin" />
             {t("ssh.connecting")}
           </div>
@@ -103,11 +107,13 @@ export function SshSignInDialog() {
               {prompt}
             </label>
             <div className="mt-1.5 flex items-center gap-1.5">
-              <input
+              <Input
                 id="ssh-answer"
                 ref={inputRef}
                 type={reveal ? "text" : "password"}
                 value={value}
+                // A password or one-time code: the browser must neither offer
+                // to fill it nor hand it to a spell checker.
                 autoComplete="off"
                 spellCheck={false}
                 disabled={submitting}
@@ -115,43 +121,38 @@ export function SshSignInDialog() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") submit();
                 }}
-                className="min-w-0 flex-1 rounded-input border border-border bg-surface px-2.5 py-1.5 font-mono text-[13px] text-text outline-none focus:border-accent disabled:opacity-50"
+                className="min-w-0 flex-1 px-2.5 font-mono text-[13px]"
               />
-              <button
-                type="button"
+              <IconButton
+                size="sm"
+                label={t(reveal ? "ssh.hide" : "ssh.reveal")}
                 onClick={() => setReveal((r) => !r)}
-                aria-label={t(reveal ? "ssh.hide" : "ssh.reveal")}
-                className="shrink-0 rounded-input p-1.5 text-muted hover:bg-surface-2 hover:text-text"
               >
                 {reveal ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>
+              </IconButton>
             </div>
           </>
         )}
 
-        <p className="mt-3 text-[11px] leading-relaxed text-muted">{t("ssh.privacy")}</p>
+        <p className="mt-3 text-[11px] leading-relaxed text-text-muted">{t("ssh.privacy")}</p>
 
         <div className="mt-3 flex justify-end gap-2">
-          <button
-            className="rounded-input border border-border px-3 py-1.5 text-sm text-text hover:bg-surface-2"
-            onClick={() => void (failed ? dismiss() : cancel())}
-          >
+          <Button variant="secondary" onClick={() => void (failed ? dismiss() : cancel())}>
             {failed ? t("ssh.close") : t("common:actions.cancel")}
-          </button>
+          </Button>
           {!failed && (
-            <button
-              className={cn(
-                "rounded-input bg-accent px-3 py-1.5 text-sm font-medium text-accent-fg hover:opacity-90",
-                (submitting || !prompt || !value) && "opacity-40",
-              )}
+            // The one action this modal exists for, so it carries the brand
+            // pop; everything else here is secondary chrome.
+            <Button
+              variant="brand"
               disabled={submitting || !prompt || !value}
               onClick={submit}
             >
               {t("ssh.submit")}
-            </button>
+            </Button>
           )}
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

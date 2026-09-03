@@ -6,13 +6,13 @@ import { isTauri } from "@/lib/tauri";
 import { useRuntimeStore } from "@/lib/runtime";
 import {
   ACP_PRESETS,
-  activeAcpAgentId,
   formatCommandArgs,
-  loadAcpAgents,
   newAcpAgentId,
   parseCommandArgs,
   saveAcpAgents,
   setActiveAcpAgentId,
+  useAcpAgents,
+  useActiveAcpAgentId,
   type AcpAgentConfig,
 } from "@/lib/acpAgents";
 import { inputCls } from "./inputCls";
@@ -32,8 +32,10 @@ import { Section } from "./Section";
  */
 export function AcpAgentsCard() {
   const { t } = useTranslation(["settings", "common"]);
-  const [agents, setAgents] = useState<AcpAgentConfig[]>(() => loadAcpAgents());
-  const [selected, setSelected] = useState<string | null>(() => activeAcpAgentId());
+  // Live, not seeded once: InstalledClisCard writes the same storage keys, and
+  // this must reflect that write without a remount (see acpAgents.ts).
+  const agents = useAcpAgents();
+  const selected = useActiveAcpAgentId();
   const [editing, setEditing] = useState<AcpAgentConfig | null>(null);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -50,8 +52,6 @@ export function AcpAgentsCard() {
   const apply = (next: AcpAgentConfig[], nextSelected: string | null, reconnect: boolean) => {
     saveAcpAgents(next);
     setActiveAcpAgentId(nextSelected);
-    setAgents(next);
-    setSelected(nextSelected);
     if (!reconnect) return;
     setBusy(true);
     void useRuntimeStore

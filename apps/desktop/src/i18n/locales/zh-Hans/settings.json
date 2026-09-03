@@ -432,5 +432,17 @@
     "reveal": "显示输入内容",
     "hide": "隐藏输入内容",
     "privacy": "只发送给本机的 ssh。不会被保存、记录日志，也不会写入溯源记录。"
+  },
+  "installedClis": {
+    "title": "已安装的 Agent CLI",
+    "hint": "在此电脑上找到的智能体命令行工具。配置其中一个后，本应用会用它驱动，而不是使用内置运行时。",
+    "refresh": "刷新",
+    "error": "无法检查已安装的 CLI。",
+    "notInstalled": "未安装",
+    "signedIn": "已登录",
+    "signedOut": "未登录",
+    "use": "使用",
+    "none": "此电脑上未找到任何已知的 Agent CLI。",
+    "added": "已配置 {{name}}。"
   }
 }

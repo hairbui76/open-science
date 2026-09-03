@@ -7,6 +7,7 @@ import { overlayTitlebarStyle } from "@/lib/titlebar";
 import { cn } from "@/lib/cn";
 import { ContextMenu, ContextMenuItem } from "@/components/ui/ContextMenu";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { IconButton } from "@/components/ui/Button";
 
 /**
  * Horizontal group/"screen" tab strip at the very top of the live surface —
@@ -67,14 +68,17 @@ export function GroupTabs() {
         {/* Sidebar expand button: only when collapsed, and it lives here since this
             strip has taken over the top row (traffic-light clearance included). */}
         {sidebarCollapsed && (
-          <button
+          <IconButton
+            // eslint-disable-next-line i18next/no-literal-string -- control size token, not UI copy
+            size="sm"
             onClick={() => setSidebarCollapsed(false)}
-            aria-label={t("nav:sidebar.expand")}
+            label={t("nav:sidebar.expand")}
+            // The shortcut belongs in the tooltip, not in the accessible name.
             title={t("nav:sidebar.expandTitle", { shortcut: isMac ? "⌘B" : "Ctrl+B" })}
-            className="fade-in mr-0.5 rounded p-1 text-text hover:bg-surface-2"
+            className="fade-in mr-0.5 text-text"
           >
             <PanelLeft size={14} strokeWidth={1.5} />
-          </button>
+          </IconButton>
         )}
         {/* This row is `flex-1`, so it covers the whole width left of the edge —
             the empty space beside the tabs included. A bare drag region applies
@@ -118,8 +122,14 @@ export function GroupTabs() {
                 onClick={() => setActiveGroup(g.id)}
                 onDoubleClick={() => setEditingId(g.id)}
                 className={cn(
-                  "group/tab flex h-7 min-w-0 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors",
-                  active ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2/60",
+                  // Pill geometry by hand rather than <Segmented>: these tabs
+                  // carry a close button, a rename field, a context menu and a
+                  // dock-drag target, none of which fit a radiogroup's single
+                  // tab stop or its one-button-per-option shape.
+                  "group/tab flex h-7 min-w-0 shrink-0 cursor-pointer items-center gap-1.5 rounded-pill px-3 text-[12px] transition-colors duration-quick ease-standard",
+                  active
+                    ? "bg-fill-2 text-text-strong"
+                    : "text-text-muted hover:bg-fill-3 hover:text-text",
                   // A tentative (preview) screen reads italic, like a browser preview tab.
                   ephemeral && "italic",
                 )}
@@ -147,7 +157,7 @@ export function GroupTabs() {
                   }}
                   aria-label={t("group.close")}
                   className={cn(
-                    "-mr-1 rounded p-0.5 text-muted hover:bg-border hover:text-text",
+                    "-mr-1.5 rounded-pill p-0.5 text-text-muted transition-colors duration-quick ease-standard hover:bg-fill hover:text-text",
                     active ? "opacity-70" : "opacity-0 group-hover/tab:opacity-70",
                   )}
                 >
@@ -157,14 +167,14 @@ export function GroupTabs() {
               </ContextMenu>
             );
           })}
-          <button
+          <IconButton
+            // eslint-disable-next-line i18next/no-literal-string -- control size token, not UI copy
+            size="sm"
             onClick={() => addGroup()}
-            aria-label={t("group.newTab")}
-            title={t("group.newTab")}
-            className="shrink-0 rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-text"
+            label={t("group.newTab")}
           >
             <Plus size={14} strokeWidth={1.5} />
-          </button>
+          </IconButton>
         </div>
       </div>
       {confirmCloseId && (
@@ -213,7 +223,9 @@ function TabNameInput({
         if (e.key === "Enter") onCommit(value);
         else if (e.key === "Escape") onCancel();
       }}
-      className="h-5 w-28 rounded border border-border bg-surface px-1 text-[12px] text-text outline-none"
+      // Sits inside the tab pill while renaming, so it keeps the tab's height
+      // rather than the shared Input's field metrics.
+      className="h-5 w-28 rounded-input border border-border-selected bg-surface px-1.5 text-[12px] text-text outline-none"
     />
   );
 }

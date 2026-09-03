@@ -30,10 +30,13 @@ export function AcpConfigPicker({
       {selectable.map((option) => (
         <select
           key={option.id}
+          // Pill geometry by hand rather than the Chip primitive: this stays a
+          // native <select> so the OS popup, keyboard and a11y come for free,
+          // and Chip is a <button>. The classes mirror Chip's resting look.
           className={cn(
-            "h-7 max-w-[9rem] shrink-0 rounded-input border border-transparent bg-transparent pl-2 text-[12px]",
-            "text-muted outline-none transition-colors select-chrome",
-            "hover:bg-surface-2 hover:text-text focus:border-accent/45 focus:bg-surface-2",
+            "h-7 max-w-[9rem] shrink-0 rounded-pill border border-border bg-surface pl-2.5 text-[12px]",
+            "text-text-muted outline-none transition-colors duration-quick ease-standard select-chrome",
+            "hover:bg-fill-3 hover:text-text focus:border-border-selected",
           )}
           aria-label={option.name ?? option.id}
           title={option.description ?? option.name ?? option.id}

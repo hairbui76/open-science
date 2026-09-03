@@ -47,6 +47,8 @@ import { SplitMenu } from "@/components/session/SplitMenu";
 import { InteractionPrompt } from "@/components/thread/InteractionPrompt";
 import { InspectorShell } from "@/components/inspector/InspectorShell";
 import { MaximizePaneButton, RightPane } from "@/components/inspector/RightPane";
+import { Button, IconButton } from "@/components/ui/Button";
+import { Panel } from "@/components/ui/Panel";
 import { SessionFilesPane } from "@/app/routes/FilesPage";
 import { RunsPane } from "@/app/routes/RunsPage";
 import { cn } from "@/lib/cn";
@@ -77,6 +79,12 @@ function findLastRunningTool(blocks?: ThreadBlocks): ToolCallBlock | undefined {
  */
 /** Header width below which the tool buttons show icons without their labels. */
 const HEADER_LABEL_MIN_PX = 620;
+
+/** Shared geometry for the header's pressed-state toggles (files, runs,
+ *  subagents, notebooks). Pill-shaped like every other control; the pressed and
+ *  hover colours are chosen per toggle so `aria-pressed` has a visible pair. */
+const HEADER_TOGGLE =
+  "flex items-center gap-1 rounded-pill px-2 py-1 text-xs transition-colors duration-quick ease-standard";
 
 /** Sessions already known to have (or not have) runs. The Runs toggle used to
  *  appear one async query after mount, and every header control that appears
@@ -543,14 +551,17 @@ export function SessionView({
           )}
         >
           {showSidebarExpand && (
-            <button
+            <IconButton
+              // eslint-disable-next-line i18next/no-literal-string -- control size token, not UI copy
+              size="sm"
               onClick={() => setSidebarCollapsed(false)}
-              aria-label={t("live.header.expandSidebarAria")}
+              label={t("live.header.expandSidebarAria")}
+              // The shortcut belongs in the tooltip, not in the accessible name.
               title={t("live.header.expandSidebarTitle", { shortcut: isMac ? "⌘B" : "Ctrl+B" })}
-              className="fade-in rounded p-1 text-text hover:bg-surface-2"
+              className="fade-in text-text"
             >
               <PanelLeft size={14} strokeWidth={1.5} />
-            </button>
+            </IconButton>
           )}
           {eid && (
             // The title doubles as a drag handle to re-dock this pane. Opt it
@@ -588,8 +599,10 @@ export function SessionView({
                 setShowFiles(!showFiles, sid ?? undefined);
               }}
               className={cn(
-                "flex items-center gap-1 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-surface-2",
-                showFiles ? "bg-surface-2 text-text" : "text-muted",
+                HEADER_TOGGLE,
+                showFiles
+                  ? "bg-fill-2 text-text-strong"
+                  : "text-text-muted hover:bg-fill-3 hover:text-text",
               )}
               title={`${t("live.filesToggle.title")}${sessionDir ? ` — ${sessionDir}` : ""}`}
               aria-pressed={showFiles}
@@ -610,8 +623,10 @@ export function SessionView({
                 setShowRuns(!showRuns, sid ?? undefined);
               }}
               className={cn(
-                "flex items-center gap-1 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-surface-2",
-                showRuns ? "bg-surface-2 text-text" : "text-muted",
+                HEADER_TOGGLE,
+                showRuns
+                  ? "bg-fill-2 text-text-strong"
+                  : "text-text-muted hover:bg-fill-3 hover:text-text",
               )}
               title={t("live.runsToggle.title")}
               aria-pressed={showRuns}
@@ -629,8 +644,10 @@ export function SessionView({
                 setShowAgents(!showAgents, sid ?? undefined);
               }}
               className={cn(
-                "flex items-center gap-1 rounded-md px-1.5 py-1 text-xs transition-colors hover:bg-surface-2",
-                showAgents ? "bg-surface-2 text-text" : "text-muted",
+                HEADER_TOGGLE,
+                showAgents
+                  ? "bg-fill-2 text-text-strong"
+                  : "text-text-muted hover:bg-fill-3 hover:text-text",
               )}
               title={t("subagents.toggleTitle")}
               aria-pressed={showAgents}
@@ -661,14 +678,15 @@ export function SessionView({
                 label={t("group.splitDown")}
               />
               {onClose && (
-                <button
+                <IconButton
+                  // eslint-disable-next-line i18next/no-literal-string -- control size token, not UI copy
+                  size="sm"
                   onClick={onClose}
-                  className="rounded-md p-1 text-muted transition-colors hover:bg-border hover:text-error"
-                  title={t("group.closePane")}
-                  aria-label={t("group.closePane")}
+                  className="hover:bg-fill hover:text-error"
+                  label={t("group.closePane")}
                 >
                   <X size={13} strokeWidth={1.5} />
-                </button>
+                </IconButton>
               )}
             </>
           )}
@@ -679,8 +697,11 @@ export function SessionView({
               key={nb.path}
               onClick={() => openNotebook(nb)}
               className={cn(
-                "flex items-center gap-1 rounded-md px-1.5 py-1 font-mono text-xs transition-colors hover:bg-surface-2",
-                activeArtifact?.path === nb.path ? "bg-surface-2 text-text" : "text-muted",
+                HEADER_TOGGLE,
+                "font-mono",
+                activeArtifact?.path === nb.path
+                  ? "bg-fill-2 text-text-strong"
+                  : "text-text-muted hover:bg-fill-3 hover:text-text",
               )}
               title={t("live.notebook.openTitle", { path: nb.path })}
             >
@@ -692,8 +713,8 @@ export function SessionView({
             <button
               onClick={() => openNotebook(uniqueNotebooks[0])}
               className={cn(
-                "rounded-md p-1 text-muted transition-colors hover:bg-surface-2 hover:text-text",
-                activeArtifact?.path === uniqueNotebooks[0].path && "bg-surface-2 text-text",
+                "rounded-pill p-1 text-text-muted transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text",
+                activeArtifact?.path === uniqueNotebooks[0].path && "bg-fill-2 text-text-strong",
               )}
               title={t("live.notebook.openTitle", { path: uniqueNotebooks[0].path })}
               aria-label={t("live.notebook.openTitle", { path: uniqueNotebooks[0].path })}
@@ -706,10 +727,10 @@ export function SessionView({
               <DropdownMenu.Trigger asChild>
                 <button
                   className={cn(
-                    "rounded-md p-1 text-muted outline-none transition-colors hover:bg-surface-2 hover:text-text",
+                    "rounded-pill p-1 text-text-muted outline-none transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text",
                     activeArtifact?.path &&
                       uniqueNotebooks.some((notebook) => notebook.path === activeArtifact.path) &&
-                      "bg-surface-2 text-text",
+                      "bg-fill-2 text-text-strong",
                   )}
                   title={t("live.notebook.chooseTitle")}
                   aria-label={t("live.notebook.chooseTitle")}
@@ -721,19 +742,19 @@ export function SessionView({
                 <DropdownMenu.Content
                   align="end"
                   sideOffset={4}
-                  className="z-50 min-w-[220px] max-w-[min(320px,calc(100vw-16px))] rounded-card border border-border bg-surface p-1 text-xs text-text shadow-pop"
+                  className="z-50 min-w-[220px] max-w-[min(320px,calc(100vw-16px))] rounded-card border border-border bg-panel p-1 text-xs text-text shadow-pop"
                 >
                   {uniqueNotebooks.map((notebook) => (
                     <DropdownMenu.Item
                       key={notebook.path}
                       onSelect={() => openNotebook(notebook)}
                       className={cn(
-                        "flex cursor-pointer items-center gap-2 rounded-input px-2 py-1.5 font-mono outline-none data-[highlighted]:bg-surface-2",
-                        activeArtifact?.path === notebook.path && "bg-surface-2",
+                        "flex cursor-pointer items-center gap-2 rounded-input px-2 py-1.5 font-mono outline-none data-[highlighted]:bg-fill-3",
+                        activeArtifact?.path === notebook.path && "bg-fill-2",
                       )}
                       title={notebook.path}
                     >
-                      <NotebookPen size={12} className="shrink-0 text-muted" />
+                      <NotebookPen size={12} className="shrink-0 text-text-muted" />
                       <span className="truncate">{notebook.filename}</span>
                     </DropdownMenu.Item>
                   ))}
@@ -742,14 +763,19 @@ export function SessionView({
             </DropdownMenu.Root>
           )}
           {!connected && (
-            <button
+            // Ink, not brand: reconnecting is header plumbing, and the brand
+            // pop on this screen is the composer's send.
+            <Button
+              variant="primary"
+              // eslint-disable-next-line i18next/no-literal-string -- control size token, not UI copy
+              size="sm"
               onClick={connect}
               disabled={connecting}
-              className="flex items-center gap-1.5 rounded-input bg-accent px-2.5 py-0.5 text-xs font-medium text-accent-fg hover:opacity-90 disabled:opacity-50"
+              className="px-2.5"
             >
               {connecting ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
               {t("live.connect")}
-            </button>
+            </Button>
           )}
         </div>
 
@@ -847,7 +873,7 @@ export function SessionView({
                 </span>
                 <button
                   type="button"
-                  className="-mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full hover:bg-surface"
+                  className="-mr-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-pill transition-colors duration-quick ease-standard hover:bg-fill"
                   aria-label={t("live.review.cancelAria")}
                   title={t("live.review.cancelTitle")}
                   onClick={() => cancelAutoReview(eid)}
@@ -938,7 +964,7 @@ export function SessionView({
           >
             <button
               onClick={jumpToLatest}
-              className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border bg-surface/95 px-3 py-1.5 text-xs font-medium text-text shadow-card backdrop-blur-sm transition-colors hover:bg-surface-2"
+              className="pointer-events-auto flex items-center gap-1.5 rounded-pill border border-border bg-panel/95 px-3 py-1.5 text-xs font-medium text-text shadow-pop backdrop-blur-sm transition-colors duration-quick ease-standard hover:bg-fill-3"
               aria-label={t("live.latest")}
               title={t("live.latest")}
             >
@@ -1093,14 +1119,18 @@ function ZoomMenu({ zoom, onPick }: { zoom: number; onPick: (z: number) => void 
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="rounded-md px-1 py-1 text-xs tabular-nums text-muted transition-colors hover:bg-surface-2 hover:text-text"
+        className="rounded-pill px-2 py-1 text-xs tabular-nums text-text-muted transition-colors duration-quick ease-standard hover:bg-fill-3 hover:text-text"
         title={t("group.zoom")}
         aria-label={t("group.zoom")}
       >
         {Math.round(zoom * 100)}%
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-30 mt-1 flex flex-col rounded-md border border-border bg-surface p-1 shadow-card">
+        <Panel
+          glass
+          lifted={false}
+          className="absolute right-0 top-full z-30 mt-1 flex flex-col p-1 shadow-pop"
+        >
           {ZOOM_LEVELS.map((z) => (
             <button
               key={z}
@@ -1109,14 +1139,14 @@ function ZoomMenu({ zoom, onPick }: { zoom: number; onPick: (z: number) => void 
                 setOpen(false);
               }}
               className={cn(
-                "rounded px-3 py-1 text-left text-xs tabular-nums hover:bg-surface-2",
-                z === zoom ? "text-text" : "text-muted",
+                "rounded-input px-3 py-1 text-left text-xs tabular-nums transition-colors duration-quick ease-standard hover:bg-fill-3",
+                z === zoom ? "bg-fill-2 text-text-strong" : "text-text-muted hover:text-text",
               )}
             >
               {Math.round(z * 100)}%
             </button>
           ))}
-        </div>
+        </Panel>
       )}
     </div>
   );

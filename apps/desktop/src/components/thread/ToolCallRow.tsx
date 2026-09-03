@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Clock, ShieldQuestion, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ToolCallBlock, ToolCallStatus } from "@ai4s/shared";
 import { cn } from "@/lib/cn";
+import { Chip } from "@/components/ui/Chip";
 import { SubagentActivity } from "./SubagentActivity";
 import { RunningDot } from "./RunningDot";
 
@@ -40,7 +41,7 @@ export const ToolCallRow = memo(function ToolCallRow({ block }: { block: ToolCal
         className={cn(
           "flex items-center gap-2",
           prominent
-            ? "rounded-input border border-border bg-surface px-3 py-2 text-sm"
+            ? "rounded-card border border-border bg-surface px-3 py-2 text-sm"
             : "px-2 py-1 text-[12.5px]",
         )}
       >
@@ -57,7 +58,15 @@ export const ToolCallRow = memo(function ToolCallRow({ block }: { block: ToolCal
         >
           {block.title}
         </span>
-        {block.meta && <span className="shrink-0 text-xs text-muted">{block.meta}</span>}
+        {/* Only the attention card has the room for a chip. A quiet row is one
+            line of a dense log — a pill there would set the row's height and
+            cost more vertical space than the whole log can afford. */}
+        {block.meta &&
+          (prominent ? (
+            <Chip readOnly>{block.meta}</Chip>
+          ) : (
+            <span className="shrink-0 text-xs text-muted">{block.meta}</span>
+          ))}
       </div>
       {/* Live pulse of the subagent this task spawned — what it is doing right
           now, one quiet line. Vanishes when the task settles. It self-subscribes

@@ -66,6 +66,7 @@ import { RemoteComputeCard } from "@/components/settings/RemoteComputeCard";
 import { RemoteAccessCard } from "@/components/settings/RemoteAccessCard";
 import { TerminalCliCard } from "@/components/settings/TerminalCliCard";
 import { AcpAgentsCard } from "@/components/settings/AcpAgentsCard";
+import { InstalledClisCard } from "@/components/settings/InstalledClisCard";
 import { ModalCard } from "@/components/settings/ModalCard";
 import { DataFlowCard } from "@/components/settings/DataFlowCard";
 import { ModelBrowser } from "@/components/settings/ModelBrowser";
@@ -1731,7 +1732,12 @@ export function SettingsPage() {
         )}
 
         {/* ---- Which agent this app drives: OpenCode, or an ACP agent (#14) ---- */}
-        {section === "runtime" && <AcpAgentsCard />}
+        {section === "runtime" && (
+          <>
+            <InstalledClisCard />
+            <AcpAgentsCard />
+          </>
+        )}
 
         {/* ---- Local Python kernel ---- */}
         {section === "runtime" && isTauri && (
