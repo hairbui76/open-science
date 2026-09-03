@@ -22,6 +22,7 @@ mod agent_cli;
 mod runs;
 mod runs_index;
 mod runtime;
+mod session_sync;
 mod science_mcp;
 mod ssh_session;
 mod tools;
@@ -121,6 +122,10 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            session_sync::sync_export_session,
+            session_sync::sync_import_session,
+            session_sync::sync_list_mirror,
+            session_sync::sync_check_dir,
             runtime::start_runtime,
             runtime::restart_runtime,
             runtime::runtime_started_at,
