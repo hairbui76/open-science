@@ -48,14 +48,23 @@ fn is_executable(p: &Path) -> bool {
     std::fs::metadata(p).map(|m| m.is_file()).unwrap_or(false)
 }
 
-/// The suffixes a shell would try when the invocation carries no extension.
+/// What a Windows shell appends to a bare name, in PATHEXT's order.
 ///
-/// Windows keeps the extension on the file, and the launchers people actually
-/// type are batch shims: npm ships `npx.cmd`, not `npx.exe`. Rust's own spawn
-/// only ever appends `.exe` (`sys/process/windows.rs`), which is why a bare
-/// `npx` fails with "program not found" on a machine that plainly has npx.
+/// Deliberately NO empty entry. npm installs three shims side by side — `npx`
+/// (a shell script for Git Bash), `npx.cmd` and `npx.ps1` — and on Windows an
+/// extensionless file is not a launchable image: CreateProcessW rejects it with
+/// "%1 is not a valid Win32 application" (os error 193). Trying "" first is
+/// what shipped that error in 0.6.1. Only an extension can be executed here, so
+/// only extensions are candidates.
+///
+/// This list exists at all because Rust's own spawn appends `.exe` and nothing
+/// else (`sys/process/windows.rs`), so a bare `npx` is reported as "program not
+/// found" on a machine that plainly has npx.
+pub const WINDOWS_PROGRAM_EXTS: &[&str] = &[".exe", ".bat", ".cmd"];
+
+/// The suffixes to try on this platform. Unix executes the file as named.
 #[cfg(windows)]
-pub const PROGRAM_EXTS: &[&str] = &["", ".exe", ".cmd", ".bat"];
+pub const PROGRAM_EXTS: &[&str] = WINDOWS_PROGRAM_EXTS;
 #[cfg(not(windows))]
 pub const PROGRAM_EXTS: &[&str] = &[""];
 
@@ -274,7 +283,7 @@ mod tests {
         );
         // What a shell does, and what we must do.
         assert_eq!(
-            resolve_in_dirs("npx", &dirs, &["", ".exe", ".cmd", ".bat"]).as_deref(),
+            resolve_in_dirs("npx", &dirs, WINDOWS_PROGRAM_EXTS).as_deref(),
             Some(shim.as_path())
         );
         fs::remove_dir_all(&dir).ok();
@@ -301,6 +310,32 @@ mod tests {
         assert!(
             resolve_on_path(&dir.join("missing").to_string_lossy(), "").is_none(),
             "a path that is not there is still not found"
+        );
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// npm installs THREE shims side by side: `npx` (a shell script for Git
+    /// Bash), `npx.cmd`, and `npx.ps1`. Only the `.cmd` is launchable by
+    /// CreateProcessW; handing it the extensionless one fails with "%1 is not
+    /// a valid Win32 application" (os error 193), which is exactly what an
+    /// empty first suffix produced in 0.6.1. On Windows the candidates must be
+    /// extensions only.
+    #[cfg(unix)]
+    #[test]
+    fn prefers_the_launchable_shim_over_an_extensionless_script() {
+        let dir = std::env::temp_dir().join(format!("osd-shims-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        for name in ["npx", "npx.cmd", "npx.ps1"] {
+            let f = dir.join(name);
+            fs::write(&f, "x").unwrap();
+            fs::set_permissions(&f, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let dirs = dir.to_string_lossy().to_string();
+
+        assert_eq!(
+            resolve_in_dirs("npx", &dirs, WINDOWS_PROGRAM_EXTS).as_deref(),
+            Some(dir.join("npx.cmd").as_path()),
+            "must pick the .cmd, never the extensionless shell script"
         );
         fs::remove_dir_all(&dir).ok();
     }
