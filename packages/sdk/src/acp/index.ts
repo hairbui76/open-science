@@ -6,6 +6,7 @@
 // callers import `@ai4s/sdk/acp/stdio` and `@ai4s/sdk/acp/serve-stdio`.
 export { AcpRuntime, mapToolStatus, pickPermissionOption } from "./AcpRuntime";
 export { toAcpMcpServers } from "./mcp";
+export { isWithinRoots } from "./scope";
 export { AcpAgentServer, acpToolStatus, historyNotifications } from "./server";
 export type { AcpAgentServerOptions } from "./server";
 export type { AcpMcpServer, AcpRemoteMcpServer, AcpStdioMcpServer } from "./mcp";
