@@ -146,6 +146,7 @@ vi.mock("./tauri", () => ({
   runtimeFailure: async () => null,
   takeConfigQuarantineNotice: async () => null,
   workspacePath: async () => mocks.workspace,
+  workspaceBase: async () => "/ws",
   setWorkspace: async (p: string) => {
     mocks.workspace = p;
     return p;
@@ -241,7 +242,9 @@ describe("runtime selector", () => {
     const sid = await useRuntimeStore.getState().sendPrompt("Summarize the data");
 
     expect(sid).toBe("acp-session-1");
-    const created = mocks.agent?.sent.find((m) => m.method === "session/new");
+    // The sign-in probe opens one session at connect, in the folder of that
+    // moment; the turn's own session is the last one opened.
+    const created = mocks.agent?.sent.filter((m) => m.method === "session/new").pop();
     // ACP takes the workspace folder per session, and a first send gives the
     // draft its own dated folder — so the session is created in THAT one.
     expect(created?.params).toEqual({ cwd: mocks.workspace, mcpServers: [] });
@@ -346,7 +349,9 @@ describe("runtime selector", () => {
       await useRuntimeStore.getState().connect();
       await useRuntimeStore.getState().sendPrompt("Search PubMed");
 
-      const created = mocks.agent?.sent.find((m) => m.method === "session/new");
+      // The sign-in probe opens one session at connect, in the folder of that
+    // moment; the turn's own session is the last one opened.
+    const created = mocks.agent?.sent.filter((m) => m.method === "session/new").pop();
       expect((created?.params as { mcpServers: unknown }).mcpServers).toEqual([
         // `env` travels even when empty: the published schema requires it, and
         // an agent validating with the official SDK refuses the session without it.

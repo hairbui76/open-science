@@ -10,7 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 
-import { AcpRuntime, pickPermissionOption } from "@ai4s/sdk/acp";
+import { AcpRuntime, isWithinRoots, pickPermissionOption } from "@ai4s/sdk/acp";
 import type { JsonRpcTransport, OpenCodeEvent } from "@ai4s/sdk/acp";
 
 /** Last element. `Array.prototype.at` is outside this tsconfig's lib target. */
@@ -547,6 +547,131 @@ describe("AcpRuntime", () => {
     expect(last(events)).toEqual({ type: "session.idle", sessionId: "old-1" });
   });
 
+  it("checks sign-in at connect and reports the login command", async () => {
+    // `initialize` succeeds for a signed-out agent, so "connected" in Settings
+    // said nothing. The credentials are first exercised by `session/new`, so
+    // the probe opens one and reads the answer.
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize")
+        return a.reply(msg.id, {
+          ...INITIALIZE_RESULT,
+          authMethods: [{ id: "claude-login", description: "Run `claude /login` in the terminal" }],
+        });
+      if (msg.method === "session/new")
+        return a.replyError(msg.id, -32603, "Internal error: Failed to authenticate. API Error: 401");
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    expect(runtime.getStatus()).toBe("ready");
+    expect(await runtime.probeSignIn()).toMatch(/Run `claude \/login` in the terminal/);
+    expect(runtime.signInRequired).toMatch(/Run `claude \/login` in the terminal/);
+  });
+
+  it("adopts the probe's session so connecting costs no extra round-trip", async () => {
+    let opened = 0;
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/list") return a.reply(msg.id, { sessions: [] });
+      if (msg.method === "session/new") {
+        opened++;
+        return a.reply(msg.id, { ...NEW_SESSION_RESULT, sessionId: `s-${opened}` });
+      }
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    expect(await runtime.probeSignIn()).toBeNull();
+    expect(opened).toBe(1);
+    const id = await runtime.createSession("first");
+    expect(id).toBe("s-1");
+    expect(opened).toBe(1);
+    expect((await runtime.listSessions()).find((s) => s.id === id)?.title).toBe("first");
+  });
+
+  it("does not treat a probe failure that is not about sign-in as one", async () => {
+    // Seen from a real bridge: a session that closes before answering. That is
+    // the first real createSession's to explain, with its own context.
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new")
+        return a.replyError(msg.id, -32603, "Internal error: Query closed before response received");
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    expect(await runtime.probeSignIn()).toBeNull();
+    expect(runtime.getStatus()).toBe("ready");
+  });
+
+  it("opens a fresh session when the folder moved since the probe", async () => {
+    const cwds: unknown[] = [];
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new") {
+        cwds.push((msg.params as { cwd: unknown }).cwd);
+        return a.reply(msg.id, { ...NEW_SESSION_RESULT, sessionId: `s-${cwds.length}` });
+      }
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws/a" });
+    await runtime.connect();
+    await runtime.probeSignIn();
+    runtime.setCwd("/ws/b");
+    const id = await runtime.createSession();
+    expect(id).toBe("s-2");
+    expect(cwds).toEqual(["/ws/a", "/ws/b"]);
+  });
+
+  it("lists only the sessions that live in folders this app manages", async () => {
+    // The agent's session store is shared with the user's terminal: claude
+    // Code keeps every session in ~/.claude regardless of who created it, and
+    // `session/list` without a filter returns all of them. The sidebar showed
+    // the user's unrelated terminal work. Scope to the workspace root and the
+    // project folders (in-place imports included), and keep what we created.
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new") return a.reply(msg.id, NEW_SESSION_RESULT);
+      if (msg.method === "session/list")
+        return a.reply(msg.id, {
+          sessions: [
+            { sessionId: "ws-1", cwd: "/ws/one", title: "in workspace" },
+            { sessionId: "proj-1", cwd: "/home/me/imported-proj/sub", title: "in a project" },
+            { sessionId: "terminal-1", cwd: "/home/me/other-repo", title: "terminal work" },
+            { sessionId: "prefix-trap", cwd: "/ws-not-ours/x", title: "shares a prefix only" },
+          ],
+        });
+    });
+    const runtime = new AcpRuntime({
+      transport,
+      cwd: "/ws",
+      sessionRoots: () => ["/ws", "/home/me/imported-proj"],
+    });
+    await runtime.connect();
+    const ids = (await runtime.listSessions()).map((s) => s.id).sort();
+    expect(ids).toEqual(["proj-1", "ws-1"]);
+  });
+
+  it("keeps a session it created even before the agent lists it", async () => {
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new") return a.reply(msg.id, NEW_SESSION_RESULT);
+      if (msg.method === "session/list") return a.reply(msg.id, { sessions: [] });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws", sessionRoots: () => ["/ws"] });
+    await runtime.connect();
+    const id = await runtime.createSession("mine");
+    expect((await runtime.listSessions()).map((s) => s.id)).toContain(id);
+  });
+
+  it("does not filter at all when no roots are given", async () => {
+    // Backwards compatible: a caller that never opted in sees the old behaviour.
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/list")
+        return a.reply(msg.id, { sessions: [{ sessionId: "any", cwd: "/elsewhere" }] });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    expect((await runtime.listSessions()).map((s) => s.id)).toEqual(["any"]);
+  });
+
   it("refuses a session it cannot restore rather than pretending to send", async () => {
     const { transport } = fakeAgent((msg, a) => {
       if (msg.method === "initialize")
@@ -684,5 +809,35 @@ describe("pickPermissionOption", () => {
     expect(pickPermissionOption([{ optionId: "a1", kind: "allow_once" }], "always")).toBeUndefined();
     expect(pickPermissionOption([{ optionId: "r1", kind: "reject_once" }], "once")).toBeUndefined();
     expect(pickPermissionOption(undefined, "once")).toBeUndefined();
+  });
+});
+
+describe("isWithinRoots", () => {
+  it("accepts the root itself and anything beneath it", () => {
+    expect(isWithinRoots("/ws", ["/ws"])).toBe(true);
+    expect(isWithinRoots("/ws/a/b", ["/ws"])).toBe(true);
+  });
+
+  it("rejects a sibling that merely shares a prefix", () => {
+    expect(isWithinRoots("/ws-other/x", ["/ws"])).toBe(false);
+  });
+
+  it("ignores trailing separators on either side", () => {
+    expect(isWithinRoots("/ws/a/", ["/ws/"])).toBe(true);
+  });
+
+  it("treats Windows paths case-insensitively and across slash styles", () => {
+    // The agent reports what the OS gave it; the app's project path is the
+    // canonical form. On Windows those differ in case and separators.
+    expect(isWithinRoots("C:\\Users\\Me\\Proj\\sub", ["c:/users/me/proj"])).toBe(true);
+    expect(isWithinRoots("C:\\Users\\Me\\Projects", ["c:/users/me/proj"])).toBe(false);
+  });
+
+  it("is case-sensitive on POSIX paths", () => {
+    expect(isWithinRoots("/Ws/a", ["/ws"])).toBe(false);
+  });
+
+  it("is false for an empty root list", () => {
+    expect(isWithinRoots("/ws", [])).toBe(false);
   });
 });

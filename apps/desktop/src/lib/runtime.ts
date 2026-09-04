@@ -52,6 +52,7 @@ import {
   takeConfigQuarantineNotice,
   runtimeStartedAt,
   workspacePath,
+  workspaceBase,
   workspaceSkillNames,
   type ApprovalMode,
   type ProjectImportMode,
@@ -553,6 +554,9 @@ let connectRetryDepth = 0;
 /** What the last connect() attempt failed with, masked or not — connectRetry
  *  reports it if the whole window is exhausted. */
 let lastConnectError: string | null = null;
+/** Set when the agent answered but the user must sign in first. A reconnect
+ *  loop cannot fix that, so it stops instead of masking it as "connecting". */
+let connectBlocked: string | null = null;
 /** The status the UI is allowed to see right now. */
 function visibleStatus(status: RuntimeStatus): RuntimeStatus {
   return connectRetryDepth > 0 && status !== "ready" ? "connecting" : status;
@@ -2398,7 +2402,22 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
           acp = reusableAcp;
         } else {
           const transport = await acpTransport(acpAgent.id, acpAgent.command, acpAgent.args);
-          acp = new AcpRuntime({ transport, cwd: directory, name: acpAgent.name });
+          // Sessions live in dated folders under the BASE workspace, and in
+          // each project's folder (in-place imports included). The current
+          // `directory` is one dated folder; its parent is what scopes the list.
+          const base = await workspaceBase();
+          acp = new AcpRuntime({
+            transport,
+            cwd: directory,
+            name: acpAgent.name,
+            // The agent's session store is shared with the user's terminal;
+            // only sessions in folders this app manages belong in the sidebar.
+            sessionRoots: () => [
+              ...(base ? [base] : []),
+              directory,
+              ...get().projects.map((p) => p.path),
+            ],
+          });
           acpRuntime = acp;
           acpRuntimeAgentId = acpAgent.id;
         }
@@ -3002,10 +3021,20 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
       void logDebug(`connect → ${get().serverUrl}`);
       await c.connect();
       void logDebug("connect OK");
+      // Reachable is not usable: the agent answered `initialize` but refused
+      // to open a session for want of credentials. Say so here, where Settings
+      // is looking, instead of at the first turn.
+      if (c instanceof AcpRuntime && (await c.probeSignIn())) {
+        connectBlocked = c.signInRequired;
+        void logDebug("connect: agent reachable but not signed in");
+        set({ status: "error", error: c.signInRequired });
+        return;
+      }
       // Take the status from the runtime rather than waiting for a transition:
       // a REUSED ACP agent is already "ready", so its idempotent connect emits
       // nothing and the store would sit on the "connecting" this attempt set.
       lastConnectError = null;
+      connectBlocked = null;
       set({ error: null, status: c.getStatus() });
       await get().refreshSessions();
       void get().refreshProjects();
@@ -3072,6 +3101,7 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
     // the last one stops being the truth — on screen or as this loop's verdict.
     if (get().error) set({ error: null });
     lastConnectError = null;
+    connectBlocked = null;
     let lastError: string | null = null;
     // Sidecar exits already counted before this loop began. Everything below
     // compares against it, so a crash from an hour ago cannot make this attempt
@@ -3083,6 +3113,13 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
     try {
       for (let i = 0; i < tries; i++) {
         await get().connect();
+        // The agent is up and says the user must sign in. Not a runtime that is
+        // slow to listen: another hundred attempts change nothing, and each
+        // would repaint the instruction as "connecting".
+        if (connectBlocked) {
+          set({ status: "error", error: connectBlocked });
+          return false;
+        }
         if (get().status === "ready") {
           set({ modelSwitchError: null });
           void get().reportQuarantinedConfig();

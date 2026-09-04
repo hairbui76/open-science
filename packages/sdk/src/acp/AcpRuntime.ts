@@ -26,6 +26,7 @@
 // is v1's stable way to change a model, reasoning level or permission mode, and
 // the options come from the agent (`configOptions`), never from our own catalog.
 import { BaseAgentRuntime } from "../base-runtime";
+import { isWithinRoots } from "./scope";
 import type { AgentRuntime } from "../runtime";
 import type {
   AgentInfo,
@@ -72,6 +73,11 @@ const NO_TIMEOUT = 0;
  *  do this. Its own sign-in — see `explainAuthRequired`. */
 const AUTH_REQUIRED = -32000;
 
+/** How long the sign-in probe waits for `session/new`. Well under the general
+ *  request timeout: the point is a prompt verdict for Settings, and a bridge
+ *  that cannot open a session in this time is not going to. */
+const PROBE_TIMEOUT_MS = 15_000;
+
 export interface AcpRuntimeOptions {
   transport: JsonRpcTransport;
   /** Workspace folder NEW sessions are created in — ACP takes it per session
@@ -84,6 +90,12 @@ export interface AcpRuntimeOptions {
   /** Optional label for errors and Settings ("Codex", "Gemini CLI"). Falls back
    *  to whatever the agent calls itself in `initialize`. */
   name?: string;
+  /** Folders whose sessions belong in this app's sidebar — the workspace root
+   *  and every project path. A getter, because projects come and go while the
+   *  agent process lives. The agent's store is shared with the user's terminal
+   *  (claude-code-acp uses ~/.claude), so without this every session on the
+   *  machine is listed. Omit to list everything, as before. */
+  sessionRoots?: () => readonly string[];
 }
 
 /** Pages of `session/list` to walk. A bound, not a policy: an agent with a
@@ -122,6 +134,14 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
    *  while the agent process stays. */
   private cwd: string;
   private readonly label?: string;
+  private readonly sessionRoots?: () => readonly string[];
+  /** A session opened by the sign-in probe at connect, held back from the
+   *  sidebar until the first `createSession` adopts it. Bound to the folder it
+   *  was opened in; a folder move since then discards it. */
+  private warm: { cwd: string; result: AcpNewSessionResult } | null = null;
+  /** Set by the probe when the agent is reachable but refuses to authenticate:
+   *  the full instruction, ready to show. Null when signed in or unknown. */
+  private signInProblem: string | null = null;
   /** Sessions the AGENT told us about (`session/list`), by id: their folder and
    *  title. Not sessions of ours — this is what lets a conversation created in
    *  an earlier run be restored into the folder it belongs to. */
@@ -154,6 +174,7 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     super();
     this.cwd = opts.cwd;
     this.label = opts.name;
+    this.sessionRoots = opts.sessionRoots;
     this.peer = new JsonRpcPeer(opts.transport, {
       onNotification: (method, params) => this.onNotification(method, params),
       onRequest: (method, params) => this.onAgentRequest(method, params),
@@ -308,6 +329,44 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     }
   }
 
+  /** The instruction to show when the agent is up but not signed in, or null. */
+  get signInRequired(): string | null {
+    return this.signInProblem;
+  }
+
+  /**
+   * Find out NOW whether the agent will actually work, rather than at the first
+   * turn: `initialize` succeeds for a signed-out agent, so "connected" in
+   * Settings said nothing about whether a conversation could start. Opening a
+   * session is the only request that exercises the credentials
+   * (claude-code-acp checks them when a session starts).
+   *
+   * A session that opens is kept warm and handed to the first `createSession`,
+   * so on the happy path the probe costs nothing. Only an auth-shaped refusal is
+   * reported — any other failure is the real `createSession`'s to explain, with
+   * context. Bounded: a wedged bridge must not turn "connect" into a hang.
+   *
+   * Separate from `connect()` on purpose: it needs the MCP servers shared first
+   * (a warm session opened without them would silently lack connectors), and
+   * a caller that does not want it must not pay for it.
+   */
+  async probeSignIn(timeoutMs = PROBE_TIMEOUT_MS): Promise<string | null> {
+    this.signInProblem = null;
+    const cwd = this.cwd;
+    try {
+      const result = await this.peer.request<AcpNewSessionResult>(
+        "session/new",
+        { cwd, mcpServers: this.mcpForRequest() },
+        timeoutMs,
+      );
+      this.warm = { cwd, result };
+    } catch (err) {
+      const explained = this.explainAuthRequired(err);
+      if (explained !== err) this.signInProblem = (explained as Error).message;
+    }
+    return this.signInProblem;
+  }
+
   close(): void {
     this.peer.close();
     this.setStatus("offline");
@@ -317,6 +376,18 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
 
   async createSession(title?: string): Promise<string> {
     const cwd = this.cwd;
+    // The sign-in probe already opened a session: use it if it is in this
+    // folder, so connecting did not cost the user an extra session. One bound
+    // to another folder (ACP takes cwd per session) is dropped — deleted where
+    // the agent allows, otherwise left; agents persist a session lazily, so an
+    // empty one is not litter.
+    if (this.warm) {
+      const warm = this.warm;
+      this.warm = null;
+      if (warm.cwd === cwd) return this.registerSession(warm.result, cwd, title);
+      if (this.supportsSessionDelete)
+        void this.peer.request("session/delete", { sessionId: warm.result.sessionId }).catch(() => {});
+    }
     let result: AcpNewSessionResult;
     try {
       result = await this.peer.request<AcpNewSessionResult>("session/new", {
@@ -328,6 +399,13 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
       // user sees — so this is where the dead end has to become an instruction.
       throw this.explainAuthRequired(err);
     }
+    return this.registerSession(result, cwd, title);
+  }
+
+  /** Everything a freshly opened session needs before it can be used — one
+   *  place, so a session adopted from the probe is indistinguishable from one
+   *  opened on demand. */
+  private registerSession(result: AcpNewSessionResult, cwd: string, title?: string): string {
     this.sessions.set(result.sessionId, {
       // ACP's own title (when the agent has one) arrives via `session/list`; the
       // app's is kept here so a brand-new session has a name before then.
@@ -352,9 +430,13 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
    * The agent's sessions, when it keeps any (`sessionCapabilities.list`), merged
    * with the ones created here.
    *
-   * Deliberately UNFILTERED by cwd, though `session/list` accepts that filter:
-   * the sidebar groups sessions by folder itself, and filtering would hide every
-   * conversation belonging to a project the user is not currently standing in.
+   * Scoped to the folders this app manages when `sessionRoots` is given — the
+   * base workspace and every project, NOT merely the folder the user is
+   * standing in, so nothing of theirs is hidden. The agent's store is shared
+   * with the user's terminal (claude-code-acp uses ~/.claude), and unscoped the
+   * sidebar showed all of their unrelated terminal work. `session/list`'s own
+   * `cwd` filter is not used: its semantics are the agent's to choose, and a
+   * client-side check is the same on every agent.
    * A listing failure falls back to the local sessions rather than emptying the
    * sidebar — a transient RPC error must not read as "your history is gone".
    */
@@ -370,8 +452,12 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
           "session/list",
           cursor ? { cursor } : {},
         );
+        const roots = this.sessionRoots?.();
         for (const info of result?.sessions ?? []) {
           if (!info?.sessionId) continue;
+          // Not ours: the user's terminal work in some other folder. A session
+          // without a cwd cannot be placed, so it is kept rather than lost.
+          if (roots && info.cwd && !isWithinRoots(info.cwd, roots)) continue;
           const known = this.sessions.get(info.sessionId);
           const updated = info.updatedAt ? Date.parse(info.updatedAt) : NaN;
           // Remember where it lives: restoring it later has to name the folder
