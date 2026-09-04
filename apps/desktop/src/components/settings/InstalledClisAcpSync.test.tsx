@@ -35,6 +35,7 @@ const claudeRow: detect.CliRow = {
   path: "/usr/bin/claude",
   version: "2.1.251",
   authOk: null,
+  authOutput: null,
 };
 
 describe("InstalledClisCard + AcpAgentsCard mounted together", () => {

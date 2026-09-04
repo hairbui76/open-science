@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AGENT_CLI_CATALOG } from "./cliCatalog";
+import { AGENT_CLI_CATALOG, catalogEntryForLaunch } from "./cliCatalog";
 
 describe("agent CLI catalog", () => {
   it("has a unique id per entry", () => {
@@ -43,5 +43,16 @@ describe("agent CLI catalog", () => {
     for (const e of AGENT_CLI_CATALOG) {
       if (e.authArgs) expect(e.verified).toBe(true);
     }
+  });
+});
+
+describe("catalogEntryForLaunch", () => {
+  it("finds the entry by its launch line, whatever the agent was renamed to", () => {
+    expect(catalogEntryForLaunch("npx", ["-y", "@zed-industries/claude-code-acp"])?.id).toBe("claude");
+    expect(catalogEntryForLaunch("gemini", ["--acp"])?.id).toBe("gemini");
+  });
+
+  it("is null for a hand-written command the catalog never had", () => {
+    expect(catalogEntryForLaunch("my-agent", ["--acp"])).toBeNull();
   });
 });

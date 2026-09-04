@@ -32,6 +32,12 @@ pub struct DetectedCli {
     pub version: Option<String>,
     /// None when the entry declares no auth probe — "unknown", not "signed out".
     pub auth_ok: Option<bool>,
+    /// The auth probe's trimmed stdout, when one ran. Exit status alone says
+    /// "signed in or not"; the output can say MORE — `claude auth status`
+    /// reports `apiKeySource` when an environment key is overriding the
+    /// login, which is the single most common reason a signed-in user still
+    /// gets a 401. The webview interprets it; Rust just carries it.
+    pub auth_output: Option<String>,
 }
 
 /// Is this a file we could actually execute?
@@ -199,13 +205,16 @@ fn probe_resolved(
         // unrelated check.
         if out.is_empty() { None } else { Some(out) }
     });
-    let auth_ok = auth_args.and_then(|a| run_probe(&resolved, a).map(|(ok, _)| ok));
+    let auth = auth_args.and_then(|a| run_probe(&resolved, a));
+    let auth_ok = auth.as_ref().map(|(ok, _)| *ok);
+    let auth_output = auth.map(|(_, out)| out);
     DetectedCli {
         id,
         found: true,
         path: Some(resolved.to_string_lossy().to_string()),
         version,
         auth_ok,
+        auth_output,
     }
 }
 
@@ -230,6 +239,7 @@ pub fn detect_agent_clis(probes: Vec<CliProbe>) -> Vec<DetectedCli> {
                 path: None,
                 version: None,
                 auth_ok: None,
+                auth_output: None,
             },
             Some(resolved) => {
                 probe_resolved(p.id, resolved, &p.version_args, p.auth_args.as_ref())
@@ -411,6 +421,10 @@ mod tests {
 
         assert_eq!(signed_in.auth_ok, Some(true));
         assert_eq!(signed_out.auth_ok, Some(false));
+        // The output travels too: for claude it carries `apiKeySource`, the one
+        // detail that explains a 401 on a machine that IS signed in.
+        assert_eq!(signed_in.auth_output.as_deref(), Some(""));
+        assert_eq!(no_probe.auth_output, None);
         assert_eq!(
             no_probe.auth_ok, None,
             "no authArgs means unknown, not signed out"

@@ -118,3 +118,16 @@ export const AGENT_CLI_CATALOG: readonly CliCatalogEntry[] = [
     verified: false,
   },
 ];
+
+/** The catalog entry a configured ACP agent was made from, if any — matched on
+ *  the launch line, not the display name, since the user can rename an agent
+ *  but a command is a command. Lets the Test action reuse the entry's auth
+ *  probe for an agent the user configured by hand. */
+export function catalogEntryForLaunch(command: string, args: readonly string[]): CliCatalogEntry | null {
+  const line = [command.trim(), ...args].join(" ");
+  for (const e of AGENT_CLI_CATALOG) {
+    if (e.launch.kind !== "acp") continue;
+    if ([e.launch.command, ...e.launch.args].join(" ") === line) return e;
+  }
+  return null;
+}
