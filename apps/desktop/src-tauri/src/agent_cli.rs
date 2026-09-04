@@ -48,15 +48,23 @@ fn is_executable(p: &Path) -> bool {
     std::fs::metadata(p).map(|m| m.is_file()).unwrap_or(false)
 }
 
-/// Resolve `bin` against a PATH-shaped string. Windows carries the extension
-/// on the file, not the invocation, so each candidate is tried with the
-/// suffixes a shell would add.
-pub fn resolve_on_path(bin: &str, path_var: &str) -> Option<PathBuf> {
-    #[cfg(windows)]
-    let exts: &[&str] = &["", ".exe", ".cmd", ".bat"];
-    #[cfg(not(windows))]
-    let exts: &[&str] = &[""];
+/// The suffixes a shell would try when the invocation carries no extension.
+///
+/// Windows keeps the extension on the file, and the launchers people actually
+/// type are batch shims: npm ships `npx.cmd`, not `npx.exe`. Rust's own spawn
+/// only ever appends `.exe` (`sys/process/windows.rs`), which is why a bare
+/// `npx` fails with "program not found" on a machine that plainly has npx.
+#[cfg(windows)]
+pub const PROGRAM_EXTS: &[&str] = &["", ".exe", ".cmd", ".bat"];
+#[cfg(not(windows))]
+pub const PROGRAM_EXTS: &[&str] = &[""];
 
+/// Resolve `bin` against a PATH-shaped string, trying `exts` in order.
+///
+/// The suffix list is a parameter so the Windows behaviour is testable
+/// anywhere: the `.cmd` path is the whole point of this function and would
+/// otherwise only ever run on a Windows CI runner.
+pub fn resolve_in_dirs(bin: &str, path_var: &str, exts: &[&str]) -> Option<PathBuf> {
     for dir in std::env::split_paths(path_var) {
         for ext in exts {
             let candidate = dir.join(format!("{bin}{ext}"));
@@ -66,6 +74,21 @@ pub fn resolve_on_path(bin: &str, path_var: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+/// Resolve `bin` the way this platform's shell would.
+///
+/// A name carrying a separator is already a path — an absolute launcher, or one
+/// relative to the workspace — so it is used as given rather than looked for in
+/// PATH directories, matching the shell and Rust's own spawn. Searching PATH
+/// for an absolute path would only find it by accident, and would fail
+/// outright when PATH is empty.
+pub fn resolve_on_path(bin: &str, path_var: &str) -> Option<PathBuf> {
+    if bin.contains('/') || (cfg!(windows) && bin.contains('\\')) {
+        let direct = PathBuf::from(bin);
+        return is_executable(&direct).then_some(direct);
+    }
+    resolve_in_dirs(bin, path_var, PROGRAM_EXTS)
 }
 
 /// Kill and reap a probe child that overran `PROBE_TIMEOUT`.
@@ -227,6 +250,58 @@ mod tests {
         assert!(resolve_on_path("fakecli", &dir.to_string_lossy()).is_none());
         fs::set_permissions(&f, fs::Permissions::from_mode(0o755)).unwrap();
         assert!(resolve_on_path("fakecli", &dir.to_string_lossy()).is_some());
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The npx bug: on Windows the launcher on PATH is `npx.cmd`, and Rust's
+    /// own spawn only ever appends `.exe`, so a bare `npx` reports "program not
+    /// found" on a machine that has npx installed. Resolution must find the
+    /// shim. Runs everywhere by passing the Windows suffix list explicitly.
+    #[cfg(unix)]
+    #[test]
+    fn resolves_a_launcher_that_only_exists_as_a_cmd_shim() {
+        let dir = std::env::temp_dir().join(format!("osd-cmdshim-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let shim = dir.join("npx.cmd");
+        fs::write(&shim, "@echo off\n").unwrap();
+        fs::set_permissions(&shim, fs::Permissions::from_mode(0o755)).unwrap();
+        let dirs = dir.to_string_lossy().to_string();
+
+        // What Rust's Windows spawn does today: `.exe` only.
+        assert!(
+            resolve_in_dirs("npx", &dirs, &["", ".exe"]).is_none(),
+            "an .exe-only search is what fails in the field"
+        );
+        // What a shell does, and what we must do.
+        assert_eq!(
+            resolve_in_dirs("npx", &dirs, &["", ".exe", ".cmd", ".bat"]).as_deref(),
+            Some(shim.as_path())
+        );
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A configured launcher may be a full path rather than a name on PATH.
+    /// Searching PATH directories for it would find it only by accident (a
+    /// join with an absolute path happens to yield that path) and would fail
+    /// outright when PATH is empty.
+    #[cfg(unix)]
+    #[test]
+    fn takes_a_path_as_given_instead_of_searching_for_it() {
+        let dir = std::env::temp_dir().join(format!("osd-abs-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let exe = dir.join("agentcli");
+        fs::write(&exe, "#!/bin/sh\n").unwrap();
+        fs::set_permissions(&exe, fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert_eq!(
+            resolve_on_path(&exe.to_string_lossy(), "").as_deref(),
+            Some(exe.as_path()),
+            "an absolute launcher must resolve even with an empty PATH"
+        );
+        assert!(
+            resolve_on_path(&dir.join("missing").to_string_lossy(), "").is_none(),
+            "a path that is not there is still not found"
+        );
         fs::remove_dir_all(&dir).ok();
     }
 

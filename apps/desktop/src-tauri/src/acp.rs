@@ -142,14 +142,23 @@ pub fn acp_start(
         }
     }
     let cwd = crate::runtime::workspace_dir(&app)?;
+    // GUI-launched apps get a minimal PATH; an ACP agent is usually a node or
+    // cargo binary the user installed, so search the real one.
+    let path_var = crate::runtime::enriched_path();
+    // Resolve the launcher OURSELVES rather than handing a bare name to
+    // Command::new. Rust's Windows spawn only ever appends `.exe`, but the
+    // launchers people configure here are batch shims — npm installs `npx.cmd`,
+    // not `npx.exe` — so a bare `npx` failed with "program not found" on
+    // machines that plainly had npx (see agent_cli::PROGRAM_EXTS).
+    let program = crate::agent_cli::resolve_on_path(&command, &path_var).ok_or_else(|| {
+        format!("could not find {command} on PATH — check the command, or give its full path")
+    })?;
     // quiet_command: an ACP agent is a console-subsystem binary, and a console
     // window opening beside the app for it is noise the user never asked for.
-    let mut child = crate::runtime::quiet_command(&command)
+    let mut child = crate::runtime::quiet_command(&program)
         .args(&args)
         .current_dir(&cwd)
-        // GUI-launched apps get a minimal PATH; an ACP agent is usually a node
-        // or cargo binary the user installed, so give it the real one.
-        .env("PATH", crate::runtime::enriched_path())
+        .env("PATH", &path_var)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
