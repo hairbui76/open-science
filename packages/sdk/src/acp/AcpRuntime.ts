@@ -552,9 +552,28 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
    *
    * Anything that is not `auth_required` passes through untouched.
    */
+  /** Does this error read as "the agent could not authenticate"?
+   *
+   *  ACP has a code for it (-32000), but not every agent uses it:
+   *  claude-code-acp reports a rejected key as a plain internal error carrying
+   *  the API's own words, so matching the code alone left the user staring at
+   *  a raw "API key is invalid" with nothing to act on. The text test is
+   *  deliberately narrow — an authentication word, or an HTTP 401 — because
+   *  the cost of a false positive is one extra sentence of advice, while the
+   *  cost of a miss is a dead end. */
+  private looksLikeAuthFailure(err: JsonRpcError): boolean {
+    if (err.code === AUTH_REQUIRED) return true;
+    return /\bauthenticat|\bunauthorized\b|\b401\b|api key/i.test(err.message);
+  }
+
   private explainAuthRequired(err: unknown): unknown {
-    if (!(err instanceof JsonRpcError) || err.code !== AUTH_REQUIRED) return err;
-    const offers = this.authMethods.map((m) => m.name ?? m.id).filter(Boolean);
+    if (!(err instanceof JsonRpcError) || !this.looksLikeAuthFailure(err)) return err;
+    // Prefer the method's `description`: that is where the agent puts the
+    // command to run ("Run `claude /login` in the terminal"). Its `name` only
+    // labels the method, which is the half the user cannot act on.
+    const offers = this.authMethods
+      .map((m) => m.description ?? m.name ?? m.id)
+      .filter((s): s is string => Boolean(s));
     return new Error(
       `${this.displayName} is not signed in: ${err.message}. ` +
         `Its sign-in is its own — run the agent's login command in a terminal` +

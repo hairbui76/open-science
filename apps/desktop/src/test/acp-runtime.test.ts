@@ -557,6 +557,55 @@ describe("AcpRuntime", () => {
     await expect(runtime.sendPrompt("ghost", "hi")).rejects.toThrow(/unknown session ghost/);
   });
 
+  it("tells the user the actual login command, not just the method's name", async () => {
+    // The agent ships the instruction in `description` — claude-code-acp sends
+    // "Run `claude /login` in the terminal". Naming the method ("Log in with
+    // Claude Code") without it leaves the user to guess the command, which is
+    // the one thing they needed.
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize")
+        return a.reply(msg.id, {
+          ...INITIALIZE_RESULT,
+          authMethods: [
+            {
+              id: "claude-login",
+              name: "Log in with Claude Code",
+              description: "Run `claude /login` in the terminal",
+            },
+          ],
+        });
+      if (msg.method === "session/new") return a.replyError(msg.id, -32000, "Not logged in");
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    await expect(runtime.createSession()).rejects.toThrow(/Run `claude \/login` in the terminal/);
+  });
+
+  it("explains an auth failure the agent reports as an ordinary error", async () => {
+    // claude-code-acp does not use ACP's auth_required code: a 401 surfaces as
+    // a generic internal error carrying the API's own words. Matching only on
+    // -32000 left the user staring at a raw "API key is invalid" with no next
+    // step, which is what shipped in 0.6.2.
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize")
+        return a.reply(msg.id, {
+          ...INITIALIZE_RESULT,
+          authMethods: [
+            { id: "claude-login", name: "Log in with Claude Code", description: "Run `claude /login` in the terminal" },
+          ],
+        });
+      if (msg.method === "session/new")
+        return a.replyError(
+          msg.id,
+          -32603,
+          'Internal error: Failed to authenticate. API Error: 401 {"type":"error","error":{"type":"authentication_error","message":"API key is invalid."}}',
+        );
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    await expect(runtime.createSession()).rejects.toThrow(/Run `claude \/login` in the terminal/);
+  });
+
   it("turns a signed-out agent's refusal into something the user can act on", async () => {
     // -32000 is ACP's auth_required. The sign-in is the AGENT's own, so there is
     // nothing to fix in Settings — the raw refusal is a dead end, and the whole
