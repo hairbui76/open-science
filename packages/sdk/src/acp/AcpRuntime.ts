@@ -334,6 +334,16 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     return this.signInProblem;
   }
 
+  /** Drop the session the probe opened without adopting it — for a throwaway
+   *  runtime that only existed to be tested. Deleted where the agent allows;
+   *  otherwise left to the agent's lazy persistence. */
+  async discardWarmSession(): Promise<void> {
+    const warm = this.warm;
+    this.warm = null;
+    if (!warm || !this.supportsSessionDelete) return;
+    await this.peer.request("session/delete", { sessionId: warm.result.sessionId }).catch(() => {});
+  }
+
   /**
    * Find out NOW whether the agent will actually work, rather than at the first
    * turn: `initialize` succeeds for a signed-out agent, so "connected" in

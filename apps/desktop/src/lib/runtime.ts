@@ -60,8 +60,11 @@ import {
   type ProxyMode,
   type ToolStatus,
 } from "./tauri";
+import type { JsonRpcTransport } from "@ai4s/sdk/acp";
+import { catalogEntryForLaunch } from "./cliCatalog";
+import { detectAgentClis, interpretAuth, type AuthVerdict } from "./cliDetect";
 import { isGatewayWeb, gatewayToken, gatewayOrigin } from "./webMode";
-import { activeAcpAgent } from "./acpAgents";
+import { activeAcpAgent, type AcpAgentConfig } from "./acpAgents";
 import { acpTransport } from "./acpTransport";
 import { samePath } from "./workspacePath";
 import { kernelReset } from "./kernel";
@@ -156,6 +159,15 @@ export type InstallSkillResult =
 
 /** What a session's right pane shows: an artifact inspector, the Files
  *  browser, the Runs ledger, or nothing. Mutually exclusive — one pane. */
+/** What the Test button learned about a configured ACP agent. */
+export type AcpTestResult = {
+  /** It started and answered `initialize`. */
+  reachable: boolean;
+  /** Why not, when it did not. */
+  reason?: string;
+  auth: AuthVerdict;
+};
+
 export interface PaneState {
   artifact: ArtifactBlock | null;
   showFiles: boolean;
@@ -288,6 +300,9 @@ interface RuntimeState {
   connect: () => Promise<void>;
   /** Resolves true once connected, false when the retry window is exhausted. */
   connectRetry: (tries?: number) => Promise<boolean>;
+  /** Start a throwaway copy of an ACP agent and report whether it answers and
+   *  whether it can sign in — without touching the agent that is driving. */
+  testAcpAgent: (agent: AcpAgentConfig) => Promise<AcpTestResult>;
   /** Tell the user, once, that an unreadable OpenCode config was moved aside
    *  and rebuilt — otherwise settings they had (providers, MCP servers) are
    *  simply gone with no explanation (#118). */
@@ -554,9 +569,6 @@ let connectRetryDepth = 0;
 /** What the last connect() attempt failed with, masked or not — connectRetry
  *  reports it if the whole window is exhausted. */
 let lastConnectError: string | null = null;
-/** Set when the agent answered but the user must sign in first. A reconnect
- *  loop cannot fix that, so it stops instead of masking it as "connecting". */
-let connectBlocked: string | null = null;
 /** The status the UI is allowed to see right now. */
 function visibleStatus(status: RuntimeStatus): RuntimeStatus {
   return connectRetryDepth > 0 && status !== "ready" ? "connecting" : status;
@@ -3021,20 +3033,10 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
       void logDebug(`connect → ${get().serverUrl}`);
       await c.connect();
       void logDebug("connect OK");
-      // Reachable is not usable: the agent answered `initialize` but refused
-      // to open a session for want of credentials. Say so here, where Settings
-      // is looking, instead of at the first turn.
-      if (c instanceof AcpRuntime && (await c.probeSignIn())) {
-        connectBlocked = c.signInRequired;
-        void logDebug("connect: agent reachable but not signed in");
-        set({ status: "error", error: c.signInRequired });
-        return;
-      }
       // Take the status from the runtime rather than waiting for a transition:
       // a REUSED ACP agent is already "ready", so its idempotent connect emits
       // nothing and the store would sit on the "connecting" this attempt set.
       lastConnectError = null;
-      connectBlocked = null;
       set({ error: null, status: c.getStatus() });
       await get().refreshSessions();
       void get().refreshProjects();
@@ -3080,6 +3082,51 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
   // fail against a sidecar that is spawned but not yet listening, which used to
   // strobe the page connecting→error→connecting four times a second. The last
   // error is surfaced only if the whole retry window is exhausted.
+  testAcpAgent: async (agent) => {
+    const directory = get().workspace;
+    if (!directory) {
+      return {
+        reachable: false,
+        reason: "No workspace folder to run the ACP agent in.",
+        auth: { kind: "unknown" },
+      };
+    }
+    // A separate child under its own id: the live agent, if this is the one
+    // driving, keeps running untouched — the Rust supervisor keys children by id.
+    const testId = `${agent.id}:test`;
+    let transport: JsonRpcTransport | null = null;
+    let reachable = false;
+    let reason: string | undefined;
+    let refused: string | null = null;
+    try {
+      transport = await acpTransport(testId, agent.command, agent.args);
+      const runtime = new AcpRuntime({ transport, cwd: directory, name: agent.name });
+      await runtime.connect();
+      // Opening a session is what a Codex-style agent refuses when signed out.
+      // claude-code-acp opens one regardless and only fails at the first turn,
+      // which is why the CLI's own account is consulted below as well.
+      refused = await runtime.probeSignIn();
+      reachable = true;
+      await runtime.discardWarmSession();
+    } catch (err) {
+      reason = err instanceof Error ? err.message : String(err);
+    } finally {
+      transport?.close();
+    }
+    if (refused) return { reachable: true, auth: { kind: "signedOut", hint: refused } };
+    // When the launch line is one the catalog knows, its CLI can be asked
+    // directly — and `claude auth status` says the one thing a 401 on a
+    // signed-in machine needs said: which environment variable is overriding
+    // the login.
+    let auth: AuthVerdict = { kind: "unknown" };
+    const entry = catalogEntryForLaunch(agent.command, agent.args);
+    if (entry?.authArgs) {
+      const row = (await detectAgentClis()).find((r) => r.id === entry.id);
+      if (row?.found) auth = interpretAuth(row);
+    }
+    return reachable ? { reachable, auth } : { reachable, reason, auth };
+  },
+
   connectRetry: async (tries = 120) => {
     // Same hold the SDK's own reconnect gets: a deliberate reconnect that
     // succeeds immediately must not repaint every status consumer on the way
@@ -3101,7 +3148,6 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
     // the last one stops being the truth — on screen or as this loop's verdict.
     if (get().error) set({ error: null });
     lastConnectError = null;
-    connectBlocked = null;
     let lastError: string | null = null;
     // Sidecar exits already counted before this loop began. Everything below
     // compares against it, so a crash from an hour ago cannot make this attempt
@@ -3113,13 +3159,6 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
     try {
       for (let i = 0; i < tries; i++) {
         await get().connect();
-        // The agent is up and says the user must sign in. Not a runtime that is
-        // slow to listen: another hundred attempts change nothing, and each
-        // would repaint the instruction as "connecting".
-        if (connectBlocked) {
-          set({ status: "error", error: connectBlocked });
-          return false;
-        }
         if (get().status === "ready") {
           set({ modelSwitchError: null });
           void get().reportQuarantinedConfig();
