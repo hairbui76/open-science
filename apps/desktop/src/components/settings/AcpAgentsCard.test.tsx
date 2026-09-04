@@ -8,13 +8,15 @@ import { AcpAgentsCard } from "./AcpAgentsCard";
 // The card only decides WHICH runtime to connect to; the connection itself is
 // the store's job, so a reconnect is a spy here.
 const connectRetry = vi.hoisted(() => vi.fn(async () => true));
+const testAcpAgent = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tauri", () => ({ isTauri: true }));
 
 beforeEach(() => {
   window.localStorage.clear();
   connectRetry.mockClear();
-  useRuntimeStore.setState({ connectRetry, status: "ready", runtimeKind: "opencode" });
+  testAcpAgent.mockReset();
+  useRuntimeStore.setState({ connectRetry, testAcpAgent, status: "ready", runtimeKind: "opencode" });
 });
 
 describe("Settings → the agent this app drives", () => {
@@ -96,5 +98,54 @@ describe("Settings → the agent this app drives", () => {
     // The running child was started from the OLD command line — restart it, or
     // Settings describes one agent while another one answers.
     expect(connectRetry).toHaveBeenCalled();
+  });
+});
+
+describe("Test", () => {
+  const seed = () => {
+    window.localStorage.setItem(
+      "ai4s.acp.agents.v1",
+      JSON.stringify([
+        { id: "acp-1", name: "Claude Code", command: "npx", args: ["-y", "@zed-industries/claude-code-acp"] },
+      ]),
+    );
+  };
+
+  it("runs the store's test for that agent and shows what it found", async () => {
+    seed();
+    testAcpAgent.mockResolvedValue({ reachable: true, auth: { kind: "ok" } });
+    render(<AcpAgentsCard />);
+    await userEvent.click(await screen.findByRole("button", { name: "Test" }));
+    expect(testAcpAgent).toHaveBeenCalledWith(expect.objectContaining({ id: "acp-1" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Started, answered, and signed in.");
+    // Testing must never switch or reconnect the agent that is driving.
+    expect(connectRetry).not.toHaveBeenCalled();
+  });
+
+  it("names the environment variable that overrides a real login", async () => {
+    seed();
+    testAcpAgent.mockResolvedValue({
+      reachable: true,
+      auth: { kind: "envKeyOverride", variable: "ANTHROPIC_API_KEY" },
+    });
+    render(<AcpAgentsCard />);
+    await userEvent.click(await screen.findByRole("button", { name: "Test" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      /ANTHROPIC_API_KEY in your environment overrides/,
+    );
+  });
+
+  it("says why when the agent could not even start", async () => {
+    seed();
+    testAcpAgent.mockResolvedValue({
+      reachable: false,
+      reason: "could not find npx on PATH",
+      auth: { kind: "unknown" },
+    });
+    render(<AcpAgentsCard />);
+    await userEvent.click(await screen.findByRole("button", { name: "Test" }));
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Could not start: could not find npx on PATH",
+    );
   });
 });

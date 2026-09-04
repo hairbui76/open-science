@@ -74,7 +74,14 @@
     "argsPlaceholder": "Argumentos (-y @agentclientprotocol/codex-acp)",
     "limits": "Un agente ACP se ejecuta como un comando en este equipo, dentro de la carpeta del espacio de trabajo actual. Gestiona su propio modelo, habilidades e historial, así que el selector de modelo, el modo plan y las conversaciones guardadas siguen siendo de OpenCode: las sesiones iniciadas en un agente ACP solo aparecen mientras la aplicación está abierta.",
     "running": "Conectado al agente ACP.",
-    "starting": "Iniciando el agente ACP…"
+    "starting": "Iniciando el agente ACP…",
+    "test": "Probar",
+    "testing": "Probando…",
+    "testOk": "Se inició, respondió y ha iniciado sesión.",
+    "testReachable": "Se inició y respondió. No se comprobó el inicio de sesión de este agente.",
+    "testNotSignedIn": "Se inició, pero no ha iniciado sesión: ejecuta {{hint}} en una terminal.",
+    "testEnvKey": "Ha iniciado sesión, pero {{variable}} en tu entorno prevalece sobre ese inicio de sesión y el agente usará esa clave. Si está caducada, elimínala y reinicia la aplicación por completo.",
+    "testFailed": "No se pudo iniciar: {{reason}}"
   },
   "updates": {
     "title": "Actualizaciones de la app",

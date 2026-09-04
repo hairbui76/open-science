@@ -74,7 +74,14 @@
     "argsPlaceholder": "Arguments (-y @agentclientprotocol/codex-acp)",
     "limits": "Un agent ACP s'exécute comme une commande sur cet ordinateur, dans le dossier de l'espace de travail actuel. Il gère lui-même son modèle, ses compétences et son historique : le sélecteur de modèle, le mode plan et les conversations enregistrées restent propres à OpenCode, et les sessions lancées sur un agent ACP n'apparaissent que tant que l'application est ouverte.",
     "running": "Connecté à l'agent ACP.",
-    "starting": "Démarrage de l'agent ACP…"
+    "starting": "Démarrage de l'agent ACP…",
+    "test": "Tester",
+    "testing": "Test en cours…",
+    "testOk": "Démarré, a répondu et est connecté.",
+    "testReachable": "Démarré et a répondu. La connexion n'a pas été vérifiée pour cet agent.",
+    "testNotSignedIn": "Démarré, mais non connecté — exécutez {{hint}} dans un terminal.",
+    "testEnvKey": "Connecté, mais {{variable}} dans votre environnement prend le pas sur cette connexion et l'agent utilisera cette clé. Si elle est périmée, supprimez-la et redémarrez complètement l'application.",
+    "testFailed": "Impossible de démarrer : {{reason}}"
   },
   "updates": {
     "title": "Mises à jour de l'app",

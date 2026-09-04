@@ -74,7 +74,14 @@
     "argsPlaceholder": "Argumente (-y @agentclientprotocol/codex-acp)",
     "limits": "Ein ACP-Agent läuft als Befehl auf diesem Rechner, im aktuellen Arbeitsbereich-Ordner. Er verwaltet Modell, Skills und Verlauf selbst – Modellauswahl, Planmodus und gespeicherte Unterhaltungen bleiben bei OpenCode, und auf einem ACP-Agenten gestartete Sitzungen erscheinen nur, solange die App läuft.",
     "running": "Mit dem ACP-Agenten verbunden.",
-    "starting": "ACP-Agent wird gestartet…"
+    "starting": "ACP-Agent wird gestartet…",
+    "test": "Testen",
+    "testing": "Wird getestet…",
+    "testOk": "Gestartet, geantwortet und angemeldet.",
+    "testReachable": "Gestartet und geantwortet. Die Anmeldung wurde für diesen Agenten nicht geprüft.",
+    "testNotSignedIn": "Gestartet, aber nicht angemeldet — führe {{hint}} in einem Terminal aus.",
+    "testEnvKey": "Angemeldet, aber {{variable}} in deiner Umgebung überschreibt diese Anmeldung, und der Agent verwendet den Schlüssel. Falls er veraltet ist, entferne ihn und starte die App vollständig neu.",
+    "testFailed": "Konnte nicht starten: {{reason}}"
   },
   "updates": {
     "title": "App-Updates",

@@ -74,7 +74,14 @@
     "argsPlaceholder": "Arguments (-y @agentclientprotocol/codex-acp)",
     "limits": "An ACP agent runs as a command on this computer, in the current workspace folder. It owns its own model, skills and history, so the model picker, plan mode and saved conversations stay with OpenCode — sessions started on an ACP agent are listed only while the app is running.",
     "running": "Connected to the ACP agent.",
-    "starting": "Starting the ACP agent…"
+    "starting": "Starting the ACP agent…",
+    "test": "Test",
+    "testing": "Testing…",
+    "testOk": "Started, answered, and signed in.",
+    "testReachable": "Started and answered. Sign-in was not checked for this agent.",
+    "testNotSignedIn": "Started, but not signed in — run {{hint}} in a terminal.",
+    "testEnvKey": "Signed in, but {{variable}} in your environment overrides that login and the agent will use it. If it is stale, remove it and fully restart the app.",
+    "testFailed": "Could not start: {{reason}}"
   },
   "updates": {
     "title": "App updates",

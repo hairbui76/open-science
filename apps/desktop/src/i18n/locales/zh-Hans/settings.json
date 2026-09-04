@@ -74,7 +74,14 @@
     "argsPlaceholder": "参数（-y @agentclientprotocol/codex-acp）",
     "limits": "ACP 智能体以命令形式运行在本机的当前工作区文件夹中。它自行管理模型、技能与历史记录，因此模型选择器、计划模式和已保存的会话仍属于 OpenCode——在 ACP 智能体上创建的会话仅在应用运行期间列出。",
     "running": "已连接到 ACP 智能体。",
-    "starting": "正在启动 ACP 智能体…"
+    "starting": "正在启动 ACP 智能体…",
+    "test": "测试",
+    "testing": "正在测试…",
+    "testOk": "已启动并响应，且已登录。",
+    "testReachable": "已启动并响应。未检查此代理的登录状态。",
+    "testNotSignedIn": "已启动，但未登录 — 请在终端运行 {{hint}}。",
+    "testEnvKey": "已登录，但环境变量 {{variable}} 会覆盖该登录，代理将使用该密钥。若已失效，请删除它并完全重启应用。",
+    "testFailed": "无法启动：{{reason}}"
   },
   "updates": {
     "title": "应用更新",

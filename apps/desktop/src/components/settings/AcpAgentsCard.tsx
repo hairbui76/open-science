@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, FlaskConical, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { isTauri } from "@/lib/tauri";
-import { useRuntimeStore } from "@/lib/runtime";
+import { useRuntimeStore, type AcpTestResult } from "@/lib/runtime";
 import {
   ACP_PRESETS,
   formatCommandArgs,
@@ -39,6 +39,8 @@ export function AcpAgentsCard() {
   const [editing, setEditing] = useState<AcpAgentConfig | null>(null);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [results, setResults] = useState<Record<string, AcpTestResult>>({});
 
   const status = useRuntimeStore((s) => s.status);
   const runtimeKind = useRuntimeStore((s) => s.runtimeKind);
@@ -85,6 +87,47 @@ export function AcpAgentsCard() {
 
   const running = runtimeKind === "acp" && status === "ready";
 
+  /** Start a throwaway copy and say what it found. The agent that is driving
+   *  is not touched, so this is safe to press on the selected one too. */
+  const test = (agent: AcpAgentConfig) => {
+    if (testing) return;
+    setTesting(agent.id);
+    setResults((r) => {
+      const rest = { ...r };
+      delete rest[agent.id];
+      return rest;
+    });
+    void useRuntimeStore
+      .getState()
+      .testAcpAgent(agent)
+      .then((result) => setResults((r) => ({ ...r, [agent.id]: result })))
+      .catch((err: unknown) =>
+        setResults((r) => ({
+          ...r,
+          [agent.id]: {
+            reachable: false,
+            reason: err instanceof Error ? err.message : String(err),
+            auth: { kind: "unknown" },
+          },
+        })),
+      )
+      .finally(() => setTesting(null));
+  };
+
+  const describe = (result: AcpTestResult): { text: string; tone: "ok" | "warn" | "error" } => {
+    if (!result.reachable) return { text: t("acp.testFailed", { reason: result.reason ?? "" }), tone: "error" };
+    switch (result.auth.kind) {
+      case "ok":
+        return { text: t("acp.testOk"), tone: "ok" };
+      case "signedOut":
+        return { text: t("acp.testNotSignedIn", { hint: result.auth.hint }), tone: "warn" };
+      case "envKeyOverride":
+        return { text: t("acp.testEnvKey", { variable: result.auth.variable }), tone: "warn" };
+      default:
+        return { text: t("acp.testReachable"), tone: "ok" };
+    }
+  };
+
   return (
     <Section title={t("acp.title")} hint={t("acp.hint")} flush>
       <div className="divide-y divide-faint">
@@ -113,8 +156,42 @@ export function AcpAgentsCard() {
               selected={selected === agent.id}
               busy={busy}
               onSelect={() => select(agent.id)}
+              note={
+                testing === agent.id ? (
+                  <span className="text-muted">{t("acp.testing")}</span>
+                ) : results[agent.id] ? (
+                  (() => {
+                    const { text, tone } = describe(results[agent.id]);
+                    return (
+                      <span
+                        role="status"
+                        className={cn(
+                          tone === "ok" && "text-ok",
+                          tone === "warn" && "text-warn",
+                          tone === "error" && "text-error",
+                        )}
+                      >
+                        {text}
+                      </span>
+                    );
+                  })()
+                ) : null
+              }
               actions={
                 <>
+                  <button
+                    className={iconBtn()}
+                    aria-label={t("acp.test")}
+                    title={t("acp.test")}
+                    disabled={testing !== null}
+                    onClick={() => test(agent)}
+                  >
+                    {testing === agent.id ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <FlaskConical size={13} />
+                    )}
+                  </button>
                   <button
                     className={iconBtn()}
                     aria-label={t("acp.edit")}
@@ -194,6 +271,7 @@ function RuntimeRow({
   busy,
   onSelect,
   actions,
+  note,
 }: {
   title: string;
   subtitle: string;
@@ -202,6 +280,8 @@ function RuntimeRow({
   busy: boolean;
   onSelect: () => void;
   actions?: React.ReactNode;
+  /** A line under the subtitle — what the last Test found. */
+  note?: React.ReactNode;
 }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3">
@@ -233,6 +313,7 @@ function RuntimeRow({
         <div className={cn("mt-0.5 truncate text-xs text-muted", mono && "font-mono")}>
           {subtitle}
         </div>
+        {note && <div className="mt-1 text-xs">{note}</div>}
       </button>
       {actions && <div className="flex shrink-0 items-center gap-1">{actions}</div>}
     </div>
