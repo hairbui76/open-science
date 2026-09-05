@@ -18,6 +18,8 @@ const mocks = vi.hoisted(() => ({
   failStart: false,
   /** The active workspace folder, as the Rust side would report it. */
   workspace: "/ws/project",
+  /** What the fake answers session/new with; null = the Codex-shaped default. */
+  newSessionResult: null as null | Record<string, unknown>,
 }));
 
 /** One fake agent, reused across reconnects: `connect()` runs again whenever the
@@ -51,7 +53,7 @@ function fakeAgent() {
         push({
           jsonrpc: "2.0",
           id: msg.id,
-          result: { sessionId: "acp-session-1", configOptions: [MODEL_OPTION] },
+          result: mocks.newSessionResult ?? { sessionId: "acp-session-1", configOptions: [MODEL_OPTION] },
         });
       if (msg.method === "session/set_config_option") {
         const { value } = msg.params as { value: string };
@@ -217,6 +219,7 @@ describe("runtime selector", () => {
     mocks.agent = null;
     mocks.failStart = false;
     mocks.workspace = "/ws/project";
+    mocks.newSessionResult = null;
   });
 
   it("drives the selected ACP agent instead of the OpenCode client", async () => {
@@ -242,7 +245,9 @@ describe("runtime selector", () => {
     const sid = await useRuntimeStore.getState().sendPrompt("Summarize the data");
 
     expect(sid).toBe("acp-session-1");
-    const created = mocks.agent?.sent.find((m) => m.method === "session/new");
+    // The store opens one session at connect to learn the agent's models; the
+    // turn's own session is the last one opened.
+    const created = mocks.agent?.sent.filter((m) => m.method === "session/new").pop();
     // ACP takes the workspace folder per session, and a first send gives the
     // draft its own dated folder — so the session is created in THAT one.
     expect(created?.params).toEqual({ cwd: mocks.workspace, mcpServers: [] });
@@ -316,6 +321,31 @@ describe("runtime selector", () => {
     expect(setAt).toBeLessThan(promptAt);
   });
 
+  it("learns the agent's model list on connect, so a first draft can offer it", async () => {
+    // claude-code-acp shape: models beside the session, no config option. The
+    // list only appears when a session opens, so the store opens one right
+    // after connecting, purely to learn it.
+    mocks.newSessionResult = {
+      sessionId: "acp-session-1",
+      models: { availableModels: [{ modelId: "default" }, { modelId: "sonnet" }], currentModelId: "default" },
+    };
+    const { useRuntimeStore } = await freshStore("acp-1");
+    await useRuntimeStore.getState().connect();
+    await vi.waitFor(() => {
+      expect(useRuntimeStore.getState().acpAgentModels["acp-1"]?.models.map((m) => m.modelId)).toEqual([
+        "default",
+        "sonnet",
+      ]);
+    });
+    // The first send moves into its own dated folder, so the session opened at
+    // connect is not reused: a second one opens THERE, and the first — empty,
+    // never persisted by the bridge — is simply abandoned.
+    await useRuntimeStore.getState().sendPrompt("Summarize the data");
+    const opened = (mocks.agent?.sent ?? []).filter((m) => m.method === "session/new");
+    expect(opened).toHaveLength(2);
+    expect((opened[1].params as { cwd: string }).cwd).toMatch(/^\/ws\/\d{4}-/);
+  });
+
   it("keeps one agent process across workspace moves", async () => {
     const { useRuntimeStore } = await freshStore("acp-1");
     await useRuntimeStore.getState().connect();
@@ -377,7 +407,9 @@ describe("runtime selector", () => {
       await useRuntimeStore.getState().connect();
       await useRuntimeStore.getState().sendPrompt("Search PubMed");
 
-      const created = mocks.agent?.sent.find((m) => m.method === "session/new");
+      // The store opens one session at connect to learn the agent's models; the
+    // turn's own session is the last one opened.
+    const created = mocks.agent?.sent.filter((m) => m.method === "session/new").pop();
       expect((created?.params as { mcpServers: unknown }).mcpServers).toEqual([
         // `env` travels even when empty: the published schema requires it, and
         // an agent validating with the official SDK refuses the session without it.

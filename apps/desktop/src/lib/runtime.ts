@@ -746,19 +746,26 @@ function syncAcpConfig(set: StoreSet, sessionId: string): void {
   const rt = acpRuntime;
   if (!rt || client !== rt) return;
   const options = rt.configOptionsFor(sessionId);
-  const recent = rt.lastModels();
-  const agentId = acpRuntimeAgentId;
   set((s) => {
     const current = s.acpConfigOptions[sessionId] ?? [];
-    const next: Partial<RuntimeState> = {};
-    if (JSON.stringify(current) !== JSON.stringify(options))
-      next.acpConfigOptions = { ...s.acpConfigOptions, [sessionId]: options };
-    // Remember the agent's model list for the next draft, and across launches.
-    if (recent && agentId && JSON.stringify(s.acpAgentModels[agentId]) !== JSON.stringify(recent)) {
-      next.acpAgentModels = { ...s.acpAgentModels, [agentId]: recent };
-      saveRecord(ACP_AGENT_MODELS_KEY, next.acpAgentModels);
-    }
-    return next;
+    if (JSON.stringify(current) === JSON.stringify(options)) return {};
+    return { acpConfigOptions: { ...s.acpConfigOptions, [sessionId]: options } };
+  });
+  syncAgentModels(set);
+}
+
+/** Remember the agent's model list for the next draft, and across launches. */
+function syncAgentModels(set: StoreSet): void {
+  const rt = acpRuntime;
+  const agentId = acpRuntimeAgentId;
+  if (!rt || client !== rt || !agentId) return;
+  const recent = rt.lastModels();
+  if (!recent) return;
+  set((s) => {
+    if (JSON.stringify(s.acpAgentModels[agentId]) === JSON.stringify(recent)) return {};
+    const acpAgentModels = { ...s.acpAgentModels, [agentId]: recent };
+    saveRecord(ACP_AGENT_MODELS_KEY, acpAgentModels);
+    return { acpAgentModels };
   });
 }
 
@@ -3079,6 +3086,18 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
       void logDebug(`connect → ${get().serverUrl}`);
       await c.connect();
       void logDebug("connect OK");
+      // The agent only reveals its model list when a session opens, and a new
+      // conversation has no session until it is sent — so on a fresh launch the
+      // composer would have nothing to offer until after the first message.
+      // Open one now, off the critical path, purely to learn the list. A draft's
+      // first send moves into its own dated folder, so this session is not the
+      // one that gets used; it is abandoned, and an empty session the bridge
+      // never persists (session/load on one answers "Session not found") is
+      // not litter. One extra session/new per connect, for a selector that is
+      // there before the first message.
+      if (c instanceof AcpRuntime && !c.lastModels()) {
+        void c.probeSignIn().then(() => syncAgentModels(set));
+      }
       // Take the status from the runtime rather than waiting for a transition:
       // a REUSED ACP agent is already "ready", so its idempotent connect emits
       // nothing and the store would sit on the "connecting" this attempt set.

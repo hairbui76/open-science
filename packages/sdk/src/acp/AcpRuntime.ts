@@ -309,9 +309,15 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     const state = this.sessions.get(sessionId);
     if (!state) return [];
     const own = state.configOptions;
-    if (state.models.length === 0) return own;
     if (own.some((o) => o.category === "model" || o.id === MODEL_OPTION_ID)) return own;
-    return [...own, modelConfigOption(state.models, state.currentModelId)];
+    // A session restored from the agent's history may not carry its own model
+    // list (claude-code-acp reports none on load), but the agent's list is the
+    // same for every session, so offer that — the current model is then a best
+    // guess until the user picks one, at which point set_model makes it exact.
+    const models = state.models.length > 0 ? state.models : (this.recentModels?.models ?? []);
+    if (models.length === 0) return own;
+    const current = state.currentModelId ?? this.recentModels?.currentModelId;
+    return [...own, modelConfigOption(models, current)];
   }
 
   /** The model list from the most recent session this agent opened, for a
@@ -678,8 +684,9 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     const state = this.blankState(cwd, remembered?.title);
     this.sessions.set(sessionId, state);
     try {
+      let restored: AcpNewSessionResult | undefined;
       if (this.supportsSessionResume) {
-        await this.peer.request("session/resume", {
+        restored = await this.peer.request<AcpNewSessionResult>("session/resume", {
           sessionId,
           cwd,
           mcpServers: this.mcpForRequest(),
@@ -689,7 +696,7 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
         // arrive as live events on top of the thread already showing it.
         this.replays.set(sessionId, new ReplayCollector());
         try {
-          await this.peer.request("session/load", {
+          restored = await this.peer.request<AcpNewSessionResult>("session/load", {
             sessionId,
             cwd,
             mcpServers: this.mcpForRequest(),
@@ -697,6 +704,17 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
         } finally {
           this.replays.delete(sessionId);
         }
+      }
+      // A restore may report the session's selectors the same way a fresh
+      // session does; an agent that says nothing here leaves the blank state,
+      // and configOptionsFor falls back to the agent-level model list.
+      if (restored) {
+        this.noteModels(restored);
+        if (restored.models?.availableModels?.length) {
+          state.models = restored.models.availableModels;
+          state.currentModelId = restored.models.currentModelId;
+        }
+        if (restored.configOptions) state.configOptions = restored.configOptions;
       }
     } catch (err) {
       this.sessions.delete(sessionId);

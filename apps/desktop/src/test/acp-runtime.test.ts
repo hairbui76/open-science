@@ -719,6 +719,29 @@ describe("AcpRuntime", () => {
     expect(draft.options?.map((o) => o.value)).toEqual(["default", "sonnet"]);
   });
 
+  it("offers the agent's models on a session restored from its history", async () => {
+    // A restored session reports no models of its own (claude-code-acp), but
+    // the agent's list is the same for every session, so it is offered there
+    // too — the current model a best guess until the user picks.
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new")
+        return a.reply(msg.id, {
+          sessionId: "fresh",
+          models: { availableModels: [{ modelId: "default" }, { modelId: "sonnet" }], currentModelId: "default" },
+        });
+      if (msg.method === "session/resume") return a.reply(msg.id, {});
+      if (msg.method === "session/prompt") return a.reply(msg.id, { stopReason: "end_turn" });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    await runtime.createSession();
+    await runtime.sendPrompt("old-one", "hi"); // restores "old-one" through session/resume
+    const [option] = runtime.configOptionsFor("old-one");
+    expect(option).toMatchObject({ category: "model", currentValue: "default" });
+    expect(option.options?.map((o) => o.value)).toEqual(["default", "sonnet"]);
+  });
+
   it("lists only the sessions that live in folders this app manages", async () => {
     // The agent's session store is shared with the user's terminal: claude
     // Code keeps every session in ~/.claude regardless of who created it, and
