@@ -7,7 +7,7 @@ authors:
 repository-code: "https://github.com/ai4s-research/open-science"
 url: "https://openedscience.com"
 license: MIT
-version: 0.6.5
+version: 0.6.6
 doi: 10.5281/zenodo.22136307
 date-released: "2026-09-04"
 keywords:
