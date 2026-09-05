@@ -11,7 +11,7 @@ Two gaps separate what we ship from "use the agent CLIs already on my machine":
 1. **Nothing detects them.** Configuring an agent means typing a command and its
    arguments by hand. The app never says which CLIs are installed.
 2. **The two most common CLIs are not actually run locally.** The Claude Code and
-   Codex presets in `lib/acpAgents.ts` launch `npx -y @zed-industries/claude-code-acp`
+   Codex presets in `lib/acpAgents.ts` launch `npx -y @agentclientprotocol/claude-agent-acp`
    and `npx -y @agentclientprotocol/codex-acp` — npm bridges that need Node and a
    first-run download, on a desktop app that otherwise bundles its own runtimes.
 
