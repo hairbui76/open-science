@@ -21,6 +21,14 @@
 ; sidecar that is already gone is not an error. msedgewebview2.exe is
 ; deliberately left alone -- it is shared with every other WebView2 app.
 
+; The finish page's "Create desktop shortcut" box is unchecked by default. The
+; bundler's template turns it on through MUI_FINISHPAGE_SHOWREADME and exposes
+; no setting for the default; NSIS's off switch is this define, and it takes
+; effect because the template !includes this file (line ~35) well before it
+; inserts MUI_PAGE_FINISH. Nothing else about the checkbox changes: ticking it
+; still creates the shortcut.
+!define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
+
 !macro KillSidecarProcess name
   nsis_tauri_utils::FindProcessCurrentUser "${name}"
   Pop $0
