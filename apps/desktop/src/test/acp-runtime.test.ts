@@ -619,6 +619,86 @@ describe("AcpRuntime", () => {
     expect(cwds).toEqual(["/ws/a", "/ws/b"]);
   });
 
+  it("offers the agent's models as a selector when it gives no config option for them", async () => {
+    // claude-code-acp answers session/new with `models` and no configOptions.
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new")
+        return a.reply(msg.id, {
+          sessionId: "s1",
+          models: {
+            availableModels: [
+              { modelId: "default", name: "Default (recommended)" },
+              { modelId: "sonnet", name: "Sonnet" },
+              { modelId: "haiku", name: "Haiku" },
+            ],
+            currentModelId: "default",
+          },
+        });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    const id = await runtime.createSession();
+    const options = runtime.configOptionsFor(id);
+    expect(options).toHaveLength(1);
+    expect(options[0]).toMatchObject({ category: "model", currentValue: "default" });
+    expect(options[0].options?.map((o) => o.value)).toEqual(["default", "sonnet", "haiku"]);
+  });
+
+  it("leaves an agent's own model option alone", async () => {
+    const own = { id: "model", category: "model", currentValue: "a", options: [{ value: "a" }, { value: "b" }] };
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new")
+        return a.reply(msg.id, {
+          sessionId: "s1",
+          models: { availableModels: [{ modelId: "x" }], currentModelId: "x" },
+          configOptions: [own],
+        });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    const id = await runtime.createSession();
+    expect(runtime.configOptionsFor(id)).toEqual([own]);
+  });
+
+  it("switches the synthesised model through session/set_model", async () => {
+    const { transport, agent } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new")
+        return a.reply(msg.id, {
+          sessionId: "s1",
+          models: { availableModels: [{ modelId: "default" }, { modelId: "sonnet" }], currentModelId: "default" },
+        });
+      if (msg.method === "session/set_model") return a.reply(msg.id, {});
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    const id = await runtime.createSession();
+    const [option] = runtime.configOptionsFor(id);
+    const after = await runtime.setConfigOption(id, option.id, "sonnet");
+    const sent = agent.sent.find((m) => m.method === "session/set_model");
+    expect(sent?.params).toEqual({ sessionId: "s1", modelId: "sonnet" });
+    expect(agent.sent.some((m) => m.method === "session/set_config_option")).toBe(false);
+    expect(after[0]).toMatchObject({ currentValue: "sonnet" });
+  });
+
+  it("keeps a session the user removed out of the list when the agent cannot delete it", async () => {
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/list")
+        return a.reply(msg.id, {
+          sessions: [
+            { sessionId: "gone", cwd: "/ws", title: "removed here" },
+            { sessionId: "kept", cwd: "/ws", title: "still wanted" },
+          ],
+        });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws", hiddenSessions: () => new Set(["gone"]) });
+    await runtime.connect();
+    expect((await runtime.listSessions()).map((s) => s.id)).toEqual(["kept"]);
+  });
+
   it("lists only the sessions that live in folders this app manages", async () => {
     // The agent's session store is shared with the user's terminal: claude
     // Code keeps every session in ~/.claude regardless of who created it, and

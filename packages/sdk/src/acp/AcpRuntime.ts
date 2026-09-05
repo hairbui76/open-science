@@ -71,6 +71,10 @@ const NO_TIMEOUT = 0;
 
 /** ACP's `auth_required` error code: the agent needs a sign-in before it will
  *  do this. Its own sign-in — see `explainAuthRequired`. */
+/** Id of the model option synthesised for agents that report `models` but no
+ *  config option for it. Prefixed so it can never collide with an agent's own. */
+const MODEL_OPTION_ID = "osd:model";
+
 const AUTH_REQUIRED = -32000;
 
 /** How long the sign-in probe waits for `session/new`. Well under the general
@@ -96,6 +100,12 @@ export interface AcpRuntimeOptions {
    *  (claude-code-acp uses ~/.claude), so without this every session on the
    *  machine is listed. Omit to list everything, as before. */
   sessionRoots?: () => readonly string[];
+  /** Sessions the user removed in this app that the agent cannot delete
+   *  (`sessionCapabilities.delete` absent — claude-code-acp). Forgetting them
+   *  locally is not enough: the next `session/list` brings them straight
+   *  back, which is what "delete does not work" looked like. A getter, and
+   *  the caller's to persist. */
+  hiddenSessions?: () => ReadonlySet<string>;
 }
 
 /** Pages of `session/list` to walk. A bound, not a policy: an agent with a
@@ -135,6 +145,7 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
   private cwd: string;
   private readonly label?: string;
   private readonly sessionRoots?: () => readonly string[];
+  private readonly hiddenSessions?: () => ReadonlySet<string>;
   /** A session opened by the sign-in probe at connect, held back from the
    *  sidebar until the first `createSession` adopts it. Bound to the folder it
    *  was opened in; a folder move since then discards it. */
@@ -175,6 +186,7 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     this.cwd = opts.cwd;
     this.label = opts.name;
     this.sessionRoots = opts.sessionRoots;
+    this.hiddenSessions = opts.hiddenSessions;
     this.peer = new JsonRpcPeer(opts.transport, {
       onNotification: (method, params) => this.onNotification(method, params),
       onRequest: (method, params) => this.onAgentRequest(method, params),
@@ -261,10 +273,38 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     return this.sessions.get(sessionId)?.models ?? [];
   }
 
-  /** The agent's own selectors for a session — model, reasoning level,
-   *  permission mode, whatever it chose to expose. Empty when it exposes none. */
+  /**
+   * The agent's own selectors for a session — model, reasoning level,
+   * permission mode, whatever it chose to expose — as the composer shows them.
+   *
+   * An agent that reports its models beside the session (`models`, the older
+   * shape) but offers no `configOptions` — claude-code-acp answers exactly so,
+   * with `default / sonnet / haiku` — would otherwise leave the composer with
+   * no way to switch, and the user going to Settings for it. So a model option
+   * is synthesised from that list, under an id of our own, and
+   * `setConfigOption` routes that id to `session/set_model`, which the bridge
+   * does accept. An agent with a real model option keeps it untouched.
+   */
   configOptionsFor(sessionId: string): AcpConfigOption[] {
-    return this.sessions.get(sessionId)?.configOptions ?? [];
+    const state = this.sessions.get(sessionId);
+    if (!state) return [];
+    const own = state.configOptions;
+    if (state.models.length === 0) return own;
+    if (own.some((o) => o.category === "model" || o.id === MODEL_OPTION_ID)) return own;
+    return [
+      ...own,
+      {
+        id: MODEL_OPTION_ID,
+        name: "Model",
+        category: "model",
+        currentValue: state.currentModelId,
+        options: state.models.map((m) => ({
+          value: m.modelId,
+          name: m.name,
+          description: m.description,
+        })),
+      },
+    ];
   }
 
   /**
@@ -282,13 +322,22 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
   ): Promise<AcpConfigOption[]> {
     const state = this.sessions.get(sessionId);
     if (!state) throw new Error(`unknown session ${sessionId}`);
+    // The synthesised model option (see configOptionsFor) has no
+    // `session/set_config_option` behind it; the agent's model is changed
+    // through `session/set_model`.
+    if (configId === MODEL_OPTION_ID && !state.configOptions.some((o) => o.id === MODEL_OPTION_ID)) {
+      const modelId = String(value);
+      await this.peer.request("session/set_model", { sessionId, modelId });
+      state.currentModelId = modelId;
+      return this.configOptionsFor(sessionId);
+    }
     const result = await this.peer.request<AcpConfigOptionsResult>("session/set_config_option", {
       sessionId,
       configId,
       value,
     });
     state.configOptions = result?.configOptions ?? state.configOptions;
-    return state.configOptions;
+    return this.configOptionsFor(sessionId);
   }
 
   // ---- lifecycle ----
@@ -463,8 +512,10 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
           cursor ? { cursor } : {},
         );
         const roots = this.sessionRoots?.();
+        const hidden = this.hiddenSessions?.();
         for (const info of result?.sessions ?? []) {
           if (!info?.sessionId) continue;
+          if (hidden?.has(info.sessionId)) continue;
           // Not ours: the user's terminal work in some other folder. A session
           // without a cwd cannot be placed, so it is kept rather than lost.
           if (roots && info.cwd && !isWithinRoots(info.cwd, roots)) continue;
