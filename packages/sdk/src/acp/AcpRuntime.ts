@@ -463,7 +463,11 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     if (this.warm) {
       const warm = this.warm;
       this.warm = null;
-      if (warm.cwd === cwd) return this.registerSession(warm.result, cwd, title);
+      if (warm.cwd === cwd) {
+        const id = this.registerSession(warm.result, cwd, title);
+        await this.enforceManualMode(id);
+        return id;
+      }
       if (this.supportsSessionDelete)
         void this.peer.request("session/delete", { sessionId: warm.result.sessionId }).catch(() => {});
     }
@@ -478,12 +482,38 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
       // user sees — so this is where the dead end has to become an instruction.
       throw this.explainAuthRequired(err);
     }
-    return this.registerSession(result, cwd, title);
+    const id = this.registerSession(result, cwd, title);
+    await this.enforceManualMode(id);
+    return id;
   }
 
   private noteModels(result: AcpNewSessionResult): void {
     const models = result.models?.availableModels ?? [];
     if (models.length > 0) this.recentModels = { models, currentModelId: result.models?.currentModelId };
+  }
+
+  /**
+   * The app never runs an agent that skips approvals. claude-agent-acp opens
+   * every session in `bypassPermissions` and exposes the choice as a `mode`
+   * option; in that mode it executes without asking, and a client that
+   * answers `session/request_permission` is never consulted. Set it to Manual
+   * the moment a session is known — verified against the real bridge: in
+   * Manual a mutating command produces a permission request, and a refusal
+   * leaves the file uncreated. The user can still pick another mode for a
+   * session; the DEFAULT is what must never be off (AGENTS.md).
+   */
+  private async enforceManualMode(sessionId: string): Promise<void> {
+    const state = this.sessions.get(sessionId);
+    const mode = state?.configOptions.find((o) => o.category === "mode");
+    if (!mode || !mode.options?.length) return;
+    if (mode.currentValue === "default" || mode.currentValue === "plan") return;
+    if (!mode.options.some((v) => v.value === "default")) return;
+    try {
+      await this.setConfigOption(sessionId, mode.id, "default");
+    } catch {
+      // The session still opens; the agent's own permission requests remain
+      // the backstop, and the option's value is what the picker shows.
+    }
   }
 
   /** Everything a freshly opened session needs before it can be used — one
@@ -716,6 +746,7 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
         }
         if (restored.configOptions) state.configOptions = restored.configOptions;
       }
+      await this.enforceManualMode(sessionId);
     } catch (err) {
       this.sessions.delete(sessionId);
       // A logout can strand an existing session too — the spec says so.

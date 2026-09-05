@@ -57,7 +57,7 @@ function notify(): void {
 export const ACP_PRESETS: ReadonlyArray<Omit<AcpAgentConfig, "id">> = [
   { name: "Codex", command: "npx", args: ["-y", "@agentclientprotocol/codex-acp"] },
   { name: "Gemini CLI", command: "gemini", args: ["--acp"] },
-  { name: "Claude Code", command: "npx", args: ["-y", "@zed-industries/claude-code-acp"] },
+  { name: "Claude Code", command: "npx", args: ["-y", "@agentclientprotocol/claude-agent-acp"] },
 ];
 
 function storage(): Storage | null {
@@ -84,10 +84,23 @@ function sanitize(raw: unknown): AcpAgentConfig[] {
       id,
       name: typeof name === "string" && name.trim() ? name.trim() : command.trim(),
       command: command.trim(),
-      args: Array.isArray(args) ? args.filter((a): a is string => typeof a === "string") : [],
+      args: migrateArgs(
+        Array.isArray(args) ? args.filter((a): a is string => typeof a === "string") : [],
+      ),
     });
   }
   return out;
+}
+
+/** The Claude Code bridge was renamed upstream, and the old package is frozen:
+ *  it exposes no model, effort or permission-mode options, where the new one
+ *  exposes all three. An entry saved under the old name is read as the new
+ *  one, so the upgrade reaches users who configured the agent long ago. */
+const RENAMED_PACKAGES: Record<string, string> = {
+  "@zed-industries/claude-code-acp": "@agentclientprotocol/claude-agent-acp",
+};
+function migrateArgs(args: string[]): string[] {
+  return args.map((a) => RENAMED_PACKAGES[a] ?? a);
 }
 
 // Cached by the raw stored string, not by a version counter: a write made

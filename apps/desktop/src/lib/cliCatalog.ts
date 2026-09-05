@@ -28,7 +28,9 @@ export interface CliCatalogEntry {
 
 export const AGENT_CLI_CATALOG: readonly CliCatalogEntry[] = [
   // Claude Code has no native ACP mode (verified 2026-08-30 against 2.1.251),
-  // so it runs through Zed's bridge until the native runtime lands.
+  // so it runs through the official bridge until the native runtime lands.
+  // The bridge exposes model, effort and permission mode as config options
+  // (verified 2026-09-05 against 0.75.0); the app forces Manual on open.
   //
   // authArgs verified 2026-08-30 against a real `claude` binary: `auth status`
   // prints JSON containing "loggedIn": true and exits 0 when signed in.
@@ -38,7 +40,7 @@ export const AGENT_CLI_CATALOG: readonly CliCatalogEntry[] = [
     bin: "claude",
     versionArgs: ["--version"],
     authArgs: ["auth", "status"],
-    launch: { kind: "acp", command: "npx", args: ["-y", "@zed-industries/claude-code-acp"] },
+    launch: { kind: "acp", command: "npx", args: ["-y", "@agentclientprotocol/claude-agent-acp"] },
     verified: true,
   },
   // Codex stays on its bridge permanently: `codex exec` cannot route an

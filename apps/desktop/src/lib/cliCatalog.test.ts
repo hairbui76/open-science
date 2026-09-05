@@ -48,7 +48,7 @@ describe("agent CLI catalog", () => {
 
 describe("catalogEntryForLaunch", () => {
   it("finds the entry by its launch line, whatever the agent was renamed to", () => {
-    expect(catalogEntryForLaunch("npx", ["-y", "@zed-industries/claude-code-acp"])?.id).toBe("claude");
+    expect(catalogEntryForLaunch("npx", ["-y", "@agentclientprotocol/claude-agent-acp"])?.id).toBe("claude");
     expect(catalogEntryForLaunch("gemini", ["--acp"])?.id).toBe("gemini");
   });
 

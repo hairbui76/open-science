@@ -742,6 +742,42 @@ describe("AcpRuntime", () => {
     expect(option.options?.map((o) => o.value)).toEqual(["default", "sonnet"]);
   });
 
+  it("sets a session that opens without approvals back to Manual before anything runs", async () => {
+    // claude-agent-acp opens every session in bypassPermissions and would then
+    // execute without ever asking. Verified against the real bridge: in Manual
+    // a mutating command produces a permission request.
+    const MODE = {
+      id: "mode",
+      category: "mode",
+      currentValue: "bypassPermissions",
+      options: [{ value: "default", name: "Manual" }, { value: "bypassPermissions", name: "Bypass permissions" }],
+    };
+    const { transport, agent } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new") return a.reply(msg.id, { sessionId: "s1", configOptions: [MODE] });
+      if (msg.method === "session/set_config_option")
+        return a.reply(msg.id, { configOptions: [{ ...MODE, currentValue: "default" }] });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    const id = await runtime.createSession();
+    const set = agent.sent.find((m) => m.method === "session/set_config_option");
+    expect(set?.params).toEqual({ sessionId: "s1", configId: "mode", value: "default" });
+    expect(runtime.configOptionsFor(id)[0]).toMatchObject({ id: "mode", currentValue: "default" });
+  });
+
+  it("leaves a session alone when it already asks", async () => {
+    const MODE = { id: "mode", category: "mode", currentValue: "default", options: [{ value: "default" }] };
+    const { transport, agent } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new") return a.reply(msg.id, { sessionId: "s1", configOptions: [MODE] });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    await runtime.createSession();
+    expect(agent.sent.some((m) => m.method === "session/set_config_option")).toBe(false);
+  });
+
   it("lists only the sessions that live in folders this app manages", async () => {
     // The agent's session store is shared with the user's terminal: claude
     // Code keeps every session in ~/.claude regardless of who created it, and

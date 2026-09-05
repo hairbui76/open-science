@@ -106,3 +106,13 @@ describe("argument line", () => {
     expect(parseCommandArgs(formatCommandArgs(args))).toEqual(args);
   });
 });
+
+describe("renamed bridge packages", () => {
+  it("reads an agent saved under the old Claude Code bridge name as the new one", () => {
+    window.localStorage.setItem(
+      "ai4s.acp.agents.v1",
+      JSON.stringify([{ id: "acp-1", name: "Claude Code", command: "npx", args: ["-y", "@zed-industries/claude-code-acp"] }]),
+    );
+    expect(loadAcpAgents()[0].args).toEqual(["-y", "@agentclientprotocol/claude-agent-acp"]);
+  });
+});
