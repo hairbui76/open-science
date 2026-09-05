@@ -43,6 +43,7 @@
    removed, so every existing call site still resolves. */
 :root,
 [data-theme="warm"] {
+  color-scheme: light;
   /* Ground -> floating panel -> card. --panel is a step LIGHTER than --bg so a
      floating rail or toolbar reads as lifted off the page rather than painted
      onto it; --surface stays the flat card white. */
@@ -118,6 +119,7 @@
    controls are ink here too, and the brand pop stays terracotta so the product
    reads the same across themes. */
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #f1f1f4;
   --panel: #ffffff;
   --surface: #ffffff;
@@ -184,6 +186,7 @@
    so a filled control is a light chip on a dark surface (the same shape logic
    as warm/light, mirrored). --panel is lighter than --bg for the same float. */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #16151a;
   --panel: #201f26;
   --surface: #1e1d24;

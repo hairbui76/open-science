@@ -45,7 +45,9 @@ export function AcpConfigPicker({
           onChange={(e) => onChange(option.id, e.target.value)}
         >
           {option.options?.map((value) => (
-            <option key={value.value} value={value.value}>
+            // Chromium paints the native menu from these; without them the
+            // menu takes the page's light text on its own white background.
+            <option key={value.value} value={value.value} className="bg-surface text-text">
               {value.name ?? value.value}
             </option>
           ))}
