@@ -10,7 +10,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 
-import { AcpRuntime, isWithinRoots, pickPermissionOption } from "@ai4s/sdk/acp";
+import { AcpRuntime, isWithinRoots, modelConfigOption, pickPermissionOption } from "@ai4s/sdk/acp";
 import type { JsonRpcTransport, OpenCodeEvent } from "@ai4s/sdk/acp";
 
 /** Last element. `Array.prototype.at` is outside this tsconfig's lib target. */
@@ -697,6 +697,26 @@ describe("AcpRuntime", () => {
     const runtime = new AcpRuntime({ transport, cwd: "/ws", hiddenSessions: () => new Set(["gone"]) });
     await runtime.connect();
     expect((await runtime.listSessions()).map((s) => s.id)).toEqual(["kept"]);
+  });
+
+  it("remembers the agent's model list so a draft can offer it before its session exists", async () => {
+    const { transport } = fakeAgent((msg, a) => {
+      if (msg.method === "initialize") return a.reply(msg.id, INITIALIZE_RESULT);
+      if (msg.method === "session/new")
+        return a.reply(msg.id, {
+          sessionId: "s1",
+          models: { availableModels: [{ modelId: "default" }, { modelId: "sonnet" }], currentModelId: "default" },
+        });
+    });
+    const runtime = new AcpRuntime({ transport, cwd: "/ws" });
+    await runtime.connect();
+    expect(runtime.lastModels()).toBeNull();
+    await runtime.createSession();
+    expect(runtime.lastModels()?.models.map((m) => m.modelId)).toEqual(["default", "sonnet"]);
+    // The draft's selector: the same option shape, with the pending choice selected.
+    const draft = modelConfigOption(runtime.lastModels()!.models, "sonnet");
+    expect(draft).toMatchObject({ category: "model", currentValue: "sonnet" });
+    expect(draft.options?.map((o) => o.value)).toEqual(["default", "sonnet"]);
   });
 
   it("lists only the sessions that live in folders this app manages", async () => {

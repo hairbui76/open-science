@@ -298,6 +298,24 @@ describe("runtime selector", () => {
     expect(useRuntimeStore.getState().sessions.map((s) => s.id)).not.toContain("acp-past-1");
   });
 
+  it("sends the model chosen on a draft to the session before its first prompt", async () => {
+    // Choosing a model before the first message: nothing exists to set it on
+    // yet, so the choice waits on the draft and is applied the moment the
+    // session is created — before the prompt, through the agent's own option.
+    const { useRuntimeStore, DRAFT_KEY } = await freshStore("acp-1");
+    await useRuntimeStore.getState().connect();
+    useRuntimeStore.getState().setSessionModel(DRAFT_KEY, "gpt-5.6-sol[high]");
+    await useRuntimeStore.getState().sendPrompt("Summarize the data");
+
+    const sent = mocks.agent?.sent ?? [];
+    const setAt = sent.findIndex(
+      (m) => m.method === "session/set_config_option" && (m.params as { value: string }).value === "gpt-5.6-sol[high]",
+    );
+    const promptAt = sent.findIndex((m) => m.method === "session/prompt");
+    expect(setAt).toBeGreaterThanOrEqual(0);
+    expect(setAt).toBeLessThan(promptAt);
+  });
+
   it("keeps one agent process across workspace moves", async () => {
     const { useRuntimeStore } = await freshStore("acp-1");
     await useRuntimeStore.getState().connect();

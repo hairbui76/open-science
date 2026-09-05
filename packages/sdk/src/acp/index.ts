@@ -4,7 +4,13 @@
 // process an editor spawns) are deliberately NOT re-exported here: they own
 // `child_process` and `process.stdin`, which the webview does not have. Node
 // callers import `@ai4s/sdk/acp/stdio` and `@ai4s/sdk/acp/serve-stdio`.
-export { AcpRuntime, mapToolStatus, pickPermissionOption } from "./AcpRuntime";
+export {
+  ACP_MODEL_OPTION_ID,
+  AcpRuntime,
+  mapToolStatus,
+  modelConfigOption,
+  pickPermissionOption,
+} from "./AcpRuntime";
 export { toAcpMcpServers } from "./mcp";
 export { isWithinRoots } from "./scope";
 export { AcpAgentServer, acpToolStatus, historyNotifications } from "./server";

@@ -73,7 +73,25 @@ const NO_TIMEOUT = 0;
  *  do this. Its own sign-in — see `explainAuthRequired`. */
 /** Id of the model option synthesised for agents that report `models` but no
  *  config option for it. Prefixed so it can never collide with an agent's own. */
-const MODEL_OPTION_ID = "osd:model";
+export const ACP_MODEL_OPTION_ID = "osd:model";
+const MODEL_OPTION_ID = ACP_MODEL_OPTION_ID;
+
+/** The model selector built from an agent's own model list — the same shape
+ *  the agent would have used had it exposed one as a config option. Pure and
+ *  exported so a DRAFT, which has no session yet, can show the agent's last
+ *  known models with the user's pending choice selected. */
+export function modelConfigOption(
+  models: readonly AcpModelInfo[],
+  currentModelId: string | undefined,
+): AcpConfigOption {
+  return {
+    id: MODEL_OPTION_ID,
+    name: "Model",
+    category: "model",
+    currentValue: currentModelId,
+    options: models.map((m) => ({ value: m.modelId, name: m.name, description: m.description })),
+  };
+}
 
 const AUTH_REQUIRED = -32000;
 
@@ -153,6 +171,8 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
   /** Set by the probe when the agent is reachable but refuses to authenticate:
    *  the full instruction, ready to show. Null when signed in or unknown. */
   private signInProblem: string | null = null;
+  /** See `lastModels`. */
+  private recentModels: { models: AcpModelInfo[]; currentModelId?: string } | null = null;
   /** Sessions the AGENT told us about (`session/list`), by id: their folder and
    *  title. Not sessions of ours — this is what lets a conversation created in
    *  an earlier run be restored into the folder it belongs to. */
@@ -291,20 +311,13 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     const own = state.configOptions;
     if (state.models.length === 0) return own;
     if (own.some((o) => o.category === "model" || o.id === MODEL_OPTION_ID)) return own;
-    return [
-      ...own,
-      {
-        id: MODEL_OPTION_ID,
-        name: "Model",
-        category: "model",
-        currentValue: state.currentModelId,
-        options: state.models.map((m) => ({
-          value: m.modelId,
-          name: m.name,
-          description: m.description,
-        })),
-      },
-    ];
+    return [...own, modelConfigOption(state.models, state.currentModelId)];
+  }
+
+  /** The model list from the most recent session this agent opened, for a
+   *  draft to offer before its own session exists. Null until one has. */
+  lastModels(): { models: AcpModelInfo[]; currentModelId?: string } | null {
+    return this.recentModels;
   }
 
   /**
@@ -418,6 +431,7 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
         { cwd, mcpServers: this.mcpForRequest() },
         timeoutMs,
       );
+      this.noteModels(result);
       this.warm = { cwd, result };
     } catch (err) {
       const explained = this.explainAuthRequired(err);
@@ -461,10 +475,16 @@ export class AcpRuntime extends BaseAgentRuntime implements AgentRuntime {
     return this.registerSession(result, cwd, title);
   }
 
+  private noteModels(result: AcpNewSessionResult): void {
+    const models = result.models?.availableModels ?? [];
+    if (models.length > 0) this.recentModels = { models, currentModelId: result.models?.currentModelId };
+  }
+
   /** Everything a freshly opened session needs before it can be used — one
    *  place, so a session adopted from the probe is indistinguishable from one
    *  opened on demand. */
   private registerSession(result: AcpNewSessionResult, cwd: string, title?: string): string {
+    this.noteModels(result);
     this.sessions.set(result.sessionId, {
       // ACP's own title (when the agent has one) arrives via `session/list`; the
       // app's is kept here so a brand-new session has a name before then.

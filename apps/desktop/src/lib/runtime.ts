@@ -61,6 +61,7 @@ import {
   type ToolStatus,
 } from "./tauri";
 import type { JsonRpcTransport } from "@ai4s/sdk/acp";
+import { ACP_MODEL_OPTION_ID, type AcpModelInfo } from "@ai4s/sdk/acp";
 import { catalogEntryForLaunch } from "./cliCatalog";
 import { detectAgentClis, interpretAuth, type AuthVerdict } from "./cliDetect";
 import { isGatewayWeb, gatewayToken, gatewayOrigin } from "./webMode";
@@ -108,6 +109,9 @@ const SESSION_MODELS_KEY = "ai4s.session.models.v1";
 const SESSION_VARIANTS_KEY = "ai4s.session.variants.v1";
 /** Per ACP agent id: sessions removed here that the agent could not delete. */
 const HIDDEN_ACP_SESSIONS_KEY = "ai4s.acp.hidden.v1";
+/** Per ACP agent id: the model list its most recent session reported, so a
+ *  draft can offer a model before its own session exists. */
+const ACP_AGENT_MODELS_KEY = "ai4s.acp.models.v1";
 function loadRecord<V>(key: string): Record<string, V> {
   if (typeof window === "undefined") return {};
   try {
@@ -195,6 +199,8 @@ interface RuntimeState {
    *  composer offers instead of our model picker: ACP v1 changes a model through
    *  `session/set_config_option`, and the choices belong to the agent. */
   acpConfigOptions: Record<string, AcpConfigOption[]>;
+  /** Per ACP agent id: models its last session reported — what a draft offers. */
+  acpAgentModels: Record<string, { models: AcpModelInfo[]; currentModelId?: string }>;
   /** Set one of them. The agent answers with its complete list, which replaces
    *  ours — picking a model can change which reasoning levels exist. */
   setAcpConfigOption: (sessionId: string, configId: string, value: string) => Promise<void>;
@@ -740,11 +746,42 @@ function syncAcpConfig(set: StoreSet, sessionId: string): void {
   const rt = acpRuntime;
   if (!rt || client !== rt) return;
   const options = rt.configOptionsFor(sessionId);
+  const recent = rt.lastModels();
+  const agentId = acpRuntimeAgentId;
   set((s) => {
     const current = s.acpConfigOptions[sessionId] ?? [];
-    if (JSON.stringify(current) === JSON.stringify(options)) return {};
-    return { acpConfigOptions: { ...s.acpConfigOptions, [sessionId]: options } };
+    const next: Partial<RuntimeState> = {};
+    if (JSON.stringify(current) !== JSON.stringify(options))
+      next.acpConfigOptions = { ...s.acpConfigOptions, [sessionId]: options };
+    // Remember the agent's model list for the next draft, and across launches.
+    if (recent && agentId && JSON.stringify(s.acpAgentModels[agentId]) !== JSON.stringify(recent)) {
+      next.acpAgentModels = { ...s.acpAgentModels, [agentId]: recent };
+      saveRecord(ACP_AGENT_MODELS_KEY, next.acpAgentModels);
+    }
+    return next;
   });
+}
+
+/** A draft's chosen model, carried onto the session it just became. Applied
+ *  before the first prompt, through whichever option the agent exposes for it:
+ *  its own (`session/set_config_option`) or the synthesised one
+ *  (`session/set_model`). Nothing to do when it already matches. */
+async function applyDraftAcpModel(set: StoreSet, get: StoreGet, sessionId: string): Promise<void> {
+  const rt = acpRuntime;
+  if (!rt || client !== rt) return;
+  const chosen = get().sessionModels[sessionId];
+  if (!chosen) return;
+  const option = rt
+    .configOptionsFor(sessionId)
+    .find((o) => o.category === "model" || o.id === ACP_MODEL_OPTION_ID);
+  if (!option || option.currentValue === chosen) return;
+  if (!option.options?.some((v) => v.value === chosen)) return;
+  try {
+    await rt.setConfigOption(sessionId, option.id, chosen);
+    syncAcpConfig(set, sessionId);
+  } catch (err) {
+    set({ error: err instanceof Error ? err.message : String(err) });
+  }
 }
 
 /** Threads key for the draft conversation — its blocks move to the real
@@ -1326,8 +1363,10 @@ async function performTurn(
         };
       });
       lockKey = id;
-      // A fresh ACP session reports the agent's own selectors — surface them.
+      // A fresh ACP session reports the agent's own selectors — surface them,
+      // and send the model the draft chose before the first prompt goes out.
       syncAcpConfig(set, id);
+      await applyDraftAcpModel(set, get, id);
       // The draft's model/effort override moved onto the real id — repersist so
       // a relaunch restores this pane's model, not the global default.
       saveRecord(SESSION_MODELS_KEY, get().sessionModels);
@@ -1937,6 +1976,7 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
   runtimeKind: "opencode",
   acpAgentName: null,
   acpConfigOptions: {},
+  acpAgentModels: loadRecord(ACP_AGENT_MODELS_KEY),
   setAcpConfigOption: async (sessionId, configId, value) => {
     const rt = acpRuntime;
     if (!rt || client !== rt) return;

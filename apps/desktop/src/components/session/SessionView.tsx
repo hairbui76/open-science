@@ -23,6 +23,8 @@ import {
   rootSessionOf,
   useRuntimeStore,
 } from "@/lib/runtime";
+import { useActiveAcpAgentId } from "@/lib/acpAgents";
+import { ACP_MODEL_OPTION_ID, modelConfigOption } from "@ai4s/sdk/acp";
 import { useLayoutStore } from "@/lib/layout";
 import { startPaneDrag } from "@/lib/dragPane";
 import { isGatewayWeb } from "@/lib/webMode";
@@ -383,6 +385,19 @@ export function SessionView({
   const acp = useRuntimeStore((s) => s.runtimeKind) === "acp";
   const acpConfigOptions = useRuntimeStore((s) => s.acpConfigOptions);
   const setAcpConfigOption = useRuntimeStore((s) => s.setAcpConfigOption);
+  const acpAgentModels = useRuntimeStore((s) => s.acpAgentModels);
+  const sessionModels = useRuntimeStore((s) => s.sessionModels);
+  const setSessionModel = useRuntimeStore((s) => s.setSessionModel);
+  const acpAgentId = useActiveAcpAgentId();
+  // A draft has no session yet, so no selectors of its own: offer the agent's
+  // last known models, with the draft's pending choice selected, so the model
+  // can be picked BEFORE the first message — the way every chat app works.
+  const acpDraftOptions = useMemo(() => {
+    if (!acp || !acpAgentId) return [];
+    const recent = acpAgentModels[acpAgentId];
+    if (!recent) return [];
+    return [modelConfigOption(recent.models, sessionModels[key] ?? recent.currentModelId)];
+  }, [acp, acpAgentId, acpAgentModels, sessionModels, key]);
   const planAvailable = agents.some((a) => a.name === "plan");
   const agentMode = sessionAgents[key] ?? "build";
   const activeArtifact = pane?.artifact ?? null;
@@ -1058,10 +1073,17 @@ export function SessionView({
               // The ACP agent's own selectors stand in for the model picker: the
               // agent owns its model list, and `session/set_config_option` is how
               // v1 changes it.
-              configOptions={acp && !webReadOnly ? (acpConfigOptions[key] ?? []) : undefined}
+              configOptions={
+                acp && !webReadOnly ? (acpConfigOptions[key] ?? (sid ? [] : acpDraftOptions)) : undefined
+              }
               onConfigOption={
-                acp && sid
-                  ? (configId, value) => void setAcpConfigOption(sid, configId, value)
+                acp
+                  ? sid
+                    ? (configId, value) => void setAcpConfigOption(sid, configId, value)
+                    : (configId, value) => {
+                        // Remembered on the draft; applied to the session it becomes.
+                        if (configId === ACP_MODEL_OPTION_ID) setSessionModel(key, value);
+                      }
                   : undefined
               }
               modelSessionId={key}
