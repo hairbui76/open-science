@@ -286,6 +286,17 @@ describe("runtime selector", () => {
     expect(mocks.started).toHaveLength(1);
   });
 
+  it("keeps a session the user removed out of the sidebar even though the agent still has it", async () => {
+    // claude-code-acp has no session/delete: forgetting locally lasted until
+    // the next listing brought the row straight back. The removal is now
+    // remembered per agent and honoured by every listing.
+    window.localStorage.setItem("ai4s.acp.hidden.v1", JSON.stringify({ "acp-1": ["acp-past-1"] }));
+    const { useRuntimeStore } = await freshStore("acp-1");
+    await useRuntimeStore.getState().connect();
+    await useRuntimeStore.getState().refreshSessions();
+    expect(useRuntimeStore.getState().sessions.map((s) => s.id)).not.toContain("acp-past-1");
+  });
+
   it("keeps one agent process across workspace moves", async () => {
     const { useRuntimeStore } = await freshStore("acp-1");
     await useRuntimeStore.getState().connect();

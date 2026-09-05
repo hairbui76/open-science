@@ -106,6 +106,8 @@ const REASONING_KEY = "ai4s.models.variant.v1";
  *  which survives across runs). */
 const SESSION_MODELS_KEY = "ai4s.session.models.v1";
 const SESSION_VARIANTS_KEY = "ai4s.session.variants.v1";
+/** Per ACP agent id: sessions removed here that the agent could not delete. */
+const HIDDEN_ACP_SESSIONS_KEY = "ai4s.acp.hidden.v1";
 function loadRecord<V>(key: string): Record<string, V> {
   if (typeof window === "undefined") return {};
   try {
@@ -2429,6 +2431,10 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
               directory,
               ...get().projects.map((p) => p.path),
             ],
+            // Read on every listing, not cached: a delete writes it, and the
+            // very next listing must already honour it.
+            hiddenSessions: () =>
+              new Set(loadRecord<string[]>(HIDDEN_ACP_SESSIONS_KEY)[acpAgent.id] ?? []),
           });
           acpRuntime = acp;
           acpRuntimeAgentId = acpAgent.id;
@@ -3862,6 +3868,14 @@ export const useRuntimeStore = create<RuntimeState>((set, get) => ({
         await client.deleteSession(id);
       } catch (err) {
         set({ error: err instanceof Error ? err.message : String(err) });
+      }
+      // An agent without `session/delete` still has the session, and would
+      // list it again. Remember the removal here so the sidebar stays as the
+      // user left it; the agent's own store is not ours to edit.
+      if (client instanceof AcpRuntime && !client.supportsSessionDelete && acpRuntimeAgentId) {
+        const rec = loadRecord<string[]>(HIDDEN_ACP_SESSIONS_KEY);
+        rec[acpRuntimeAgentId] = [...new Set([...(rec[acpRuntimeAgentId] ?? []), id])];
+        saveRecord(HIDDEN_ACP_SESSIONS_KEY, rec);
       }
     }
     // A queued review for a session that no longer exists would send into a
